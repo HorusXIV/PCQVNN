@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=pcqvnn-archcmp
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=32G
+#SBATCH --cpus-per-task=64
+#SBATCH --mem=64G
 #SBATCH --time=12:00:00
 #SBATCH --output=logs/%x-%j.out
 
