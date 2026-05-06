@@ -33,12 +33,12 @@ class ArchitectureComparisonConfig:
     benchmarks: tuple[str, ...] = DEFAULT_BENCHMARKS
     architectures: tuple[ArchitectureName, ...] = DEFAULT_ARCHITECTURES
     layer_sizes: tuple[int, ...] = (1, 5, 5, 5, 1)
-    epochs: int = 5
+    epochs: int = 75
     repetitions: int = 2
     dataset_size: int = 30_000
     sample_seed: int = 0
     split_seed: int = 0
-    early_stopping: bool = False
+    early_stopping: bool = True
     batch_size: int | None = None
     hyperparameters_path: Path = default_hyperparameters_path()
     device: torch.device | str | None = None
