@@ -1,8 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=pcqvnn-archcmp
+#SBATCH -M cluster
+#SBATCH --partition=performance
 #SBATCH --cpus-per-task=64
 #SBATCH --mem=64G
-#SBATCH --time=12:00:00
+#SBATCH --time=14:00:00
 #SBATCH --output=logs/%x-%j.out
 
 set -euo pipefail
