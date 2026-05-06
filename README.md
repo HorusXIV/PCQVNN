@@ -39,7 +39,7 @@ Durch den Einsatz von PC wird die globale Fehlerfortpflanzung durch lokale Fehle
    3. Architektur: Mit einer 1-5-5-5-1 Struktur bleibt das Netzwerk flach genug, um die bekannten Konvergenzprobleme von PC in tiefen Architekturen zu vermeiden.
 
 ### Baseline & Evaluation
-Als primäre Baseline dient das CMLP (Complex Multi-Layer Perceptron)-Verfahren, das in der Vergleichsstudie von Bill et al. die besten Resultate lieferte. Evaluiert wird die Performance bei der Approximation nichtlinearer Funktionen hinsichtlich:
+Als primäre Baseline dient das CMLP (Clifford Multilayer Perceptron)-Verfahren, das in der Vergleichsstudie von Bill et al. die besten Resultate lieferte. Evaluiert wird die Performance bei der Approximation nichtlinearer Funktionen hinsichtlich:
 
 * Approximationsgenauigkeit (MSE)
 * Konvergenzgeschwindigkeit
