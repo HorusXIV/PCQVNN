@@ -1,0 +1,33 @@
+Bootstrap: docker
+From: python:3.12-slim
+
+%labels
+    Author Lukas Breiter
+    Description PCQVNN runtime for architecture comparison experiments
+
+%post
+    apt-get update
+    apt-get install -y --no-install-recommends build-essential git
+    rm -rf /var/lib/apt/lists/*
+
+    python -m pip install --upgrade pip
+    python -m pip install --no-cache-dir \
+        torch \
+        numpy \
+        scipy \
+        scikit-learn \
+        pandas \
+        pyyaml \
+        matplotlib \
+        tqdm
+
+    mkdir -p /workspace /outputs
+
+%environment
+    export PYTHONUNBUFFERED=1
+    export PYTHONPATH=/workspace/src:${PYTHONPATH}
+
+%runscript
+    cd /workspace
+    exec python -m qvnn_pc.architecture_comparison "$@"
+
