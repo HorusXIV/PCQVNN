@@ -12,10 +12,10 @@ set -euo pipefail
 PROJECT_ROOT="${PROJECT_ROOT:-$SLURM_SUBMIT_DIR}"
 CONTAINER_IMAGE="${CONTAINER_IMAGE:-$PROJECT_ROOT/cluster/pcqvnn.sif}"
 CONFIG_PATH="${CONFIG_PATH:-$PROJECT_ROOT/configs/hyperparameters.yml}"
-RESULTS_DIR="${RESULTS_DIR:-$PROJECT_ROOT/results/slurm}"
+RESULTS_ROOT="${RESULTS_ROOT:-$PROJECT_ROOT/results}"
 DEVICE="${DEVICE:-cpu}"
 
-mkdir -p "$RESULTS_DIR" "$PROJECT_ROOT/logs"
+mkdir -p "$RESULTS_ROOT" "$PROJECT_ROOT/logs"
 
 if command -v apptainer >/dev/null 2>&1; then
     RUNTIME="apptainer"
@@ -32,14 +32,25 @@ if [[ ! -f "$CONTAINER_IMAGE" ]]; then
     exit 1
 fi
 
-OUTPUT_PATH="${OUTPUT_PATH:-$RESULTS_DIR/architecture_comparison_${SLURM_JOB_ID}.csv}"
+to_container_path() {
+    local host_path="$1"
+    if [[ "$host_path" == "$PROJECT_ROOT"* ]]; then
+        printf '/workspace%s\n' "${host_path#$PROJECT_ROOT}"
+    else
+        printf '%s\n' "$host_path"
+    fi
+}
+
+CONFIG_PATH_IN_CONTAINER="$(to_container_path "$CONFIG_PATH")"
+RESULTS_ROOT_IN_CONTAINER="$(to_container_path "$RESULTS_ROOT")"
+RUN_NAME="${RUN_NAME:-slurm_${SLURM_JOB_ID}}"
 
 "$RUNTIME" exec \
     --bind "$PROJECT_ROOT:/workspace" \
     "$CONTAINER_IMAGE" \
     python -m qvnn_pc.architecture_comparison \
-    --config "$CONFIG_PATH" \
+    --config "$CONFIG_PATH_IN_CONTAINER" \
     --device "$DEVICE" \
-    --output "$OUTPUT_PATH" \
+    --results-root "$RESULTS_ROOT_IN_CONTAINER" \
+    --run-name "$RUN_NAME" \
     "$@"
-

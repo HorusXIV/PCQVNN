@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from datetime import datetime
+import json
 from pathlib import Path
+import shutil
 from typing import Literal
 
 import pandas as pd
@@ -41,6 +44,8 @@ class ArchitectureComparisonConfig:
     early_stopping: bool = True
     batch_size: int | None = None
     hyperparameters_path: Path = default_hyperparameters_path()
+    results_root: Path = Path("results")
+    run_name: str | None = None
     device: torch.device | str | None = None
     dtype: torch.dtype = torch.float32
 
@@ -92,12 +97,103 @@ def _build_model(
             generator=generator,
             device=device,
             dtype=dtype,
-        )
+    )
     raise ValueError(f"Unsupported architecture {architecture!r}.")
+
+
+def _timestamped_run_name() -> str:
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def _prepare_run_directory(config: ArchitectureComparisonConfig, output_path: Path | None) -> tuple[Path, Path]:
+    if output_path is not None:
+        run_dir = output_path.parent
+        summary_path = output_path
+    else:
+        run_dir = config.results_root / (config.run_name or _timestamped_run_name())
+        summary_path = run_dir / "architecture_comparison.csv"
+
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "models").mkdir(exist_ok=True)
+    (run_dir / "history").mkdir(exist_ok=True)
+    return run_dir, summary_path
+
+
+def _artifact_stem(benchmark: str, architecture: ArchitectureName, repetition: int) -> str:
+    return f"{benchmark}_{architecture}_rep{repetition:02d}"
+
+
+def _save_run_metadata(
+    run_dir: Path,
+    config: ArchitectureComparisonConfig,
+    *,
+    summary_path: Path,
+) -> None:
+    metadata = {
+        "benchmarks": list(config.benchmarks),
+        "architectures": list(config.architectures),
+        "layer_sizes": list(config.layer_sizes),
+        "epochs": config.epochs,
+        "repetitions": config.repetitions,
+        "dataset_size": config.dataset_size,
+        "sample_seed": config.sample_seed,
+        "split_seed": config.split_seed,
+        "early_stopping": config.early_stopping,
+        "batch_size_override": config.batch_size,
+        "hyperparameters_path": str(config.hyperparameters_path),
+        "results_root": str(config.results_root),
+        "run_name": config.run_name,
+        "summary_path": str(summary_path),
+        "device": None if config.device is None else str(config.device),
+        "dtype": str(config.dtype),
+    }
+    with (run_dir / "run_config.json").open("w", encoding="utf-8") as handle:
+        json.dump(metadata, handle, indent=2)
+
+    if config.hyperparameters_path.exists():
+        shutil.copy2(config.hyperparameters_path, run_dir / "hyperparameters.yml")
+
+
+def _save_training_artifacts(
+    run_dir: Path,
+    *,
+    benchmark: str,
+    architecture: ArchitectureName,
+    repetition: int,
+    model,
+    history: dict[str, list[float] | float | int],
+    hyperparameters,
+    batch_size: int,
+) -> None:
+    stem = _artifact_stem(benchmark, architecture, repetition)
+    history_path = run_dir / "history" / f"{stem}.json"
+    model_path = run_dir / "models" / f"{stem}.pt"
+
+    with history_path.open("w", encoding="utf-8") as handle:
+        json.dump(history, handle, indent=2)
+
+    torch.save(
+        {
+            "state_dict": model.state_dict(),
+            "benchmark": benchmark,
+            "architecture": architecture,
+            "repetition": repetition,
+            "layer_sizes": list(model.layer_sizes),
+            "activation": hyperparameters.activation,
+            "optimizer": hyperparameters.optimizer,
+            "learning_rate": hyperparameters.lr,
+            "batch_size": batch_size,
+            "history_path": str(history_path),
+            "checkpoint_note": "Model parameters restored to the best tracked validation checkpoint.",
+        },
+        model_path,
+    )
 
 
 def run_architecture_comparison(
     config: ArchitectureComparisonConfig = ArchitectureComparisonConfig(),
+    *,
+    run_dir: Path | None = None,
 ) -> pd.DataFrame:
     rows: list[dict[str, float | int | str]] = []
 
@@ -147,6 +243,17 @@ def run_architecture_comparison(
                 test_pred = model.forward(split.x_test)
                 test_metrics = scalar_regression_metrics(test_pred, split.y_test)
                 test_qmae = float(quaternion_mae_loss(test_pred, split.y_test).detach().cpu())
+                if run_dir is not None:
+                    _save_training_artifacts(
+                        run_dir,
+                        benchmark=benchmark,
+                        architecture=architecture,
+                        repetition=repetition,
+                        model=model,
+                        history=history,
+                        hyperparameters=hyperparameters,
+                        batch_size=batch_size,
+                    )
                 rows.append(
                     {
                         "repetition": repetition,
@@ -205,7 +312,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", type=Path, default=default_hyperparameters_path())
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--early-stopping", action="store_true")
-    parser.add_argument("--output", type=Path, default=Path("results/architecture_comparison.csv"))
+    parser.add_argument("--results-root", type=Path, default=Path("results"))
+    parser.add_argument("--run-name", default=None)
+    parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
 
     config = ArchitectureComparisonConfig(
@@ -219,12 +328,17 @@ def main(argv: list[str] | None = None) -> int:
         early_stopping=args.early_stopping,
         batch_size=args.batch_size,
         hyperparameters_path=args.config,
+        results_root=args.results_root,
+        run_name=args.run_name,
         dtype=_dtype_from_name(args.dtype),
         device=args.device,
     )
-    results = run_architecture_comparison(config)
-    path = write_architecture_comparison(results, args.output)
+    run_dir, summary_path = _prepare_run_directory(config, args.output)
+    _save_run_metadata(run_dir, config, summary_path=summary_path)
+    results = run_architecture_comparison(config, run_dir=run_dir)
+    path = write_architecture_comparison(results, summary_path)
     print(f"Wrote {len(results)} rows to {path}.")
+    print(f"Saved run artifacts to {run_dir}.")
     return 0
 
 
