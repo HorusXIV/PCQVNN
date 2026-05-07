@@ -66,7 +66,7 @@ trap 'cleanup_and_requeue' USR1
 echo "Job started at $(date) (restart count: ${SLURM_RESTART_COUNT:-0})"
 echo "Run output will be written to $OUTPUT_PATH_IN_CONTAINER"
 
-timeout --signal=SIGUSR1 23h50m \
+timeout --signal=SIGUSR1 1430m \
     "$RUNTIME" exec \
     --bind "$PROJECT_ROOT:/workspace" \
     "$CONTAINER_IMAGE" \
