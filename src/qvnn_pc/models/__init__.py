@@ -12,6 +12,11 @@ from .cmlp import CMLPQuaternionMLP
 from .ghr import (
     GHRQuaternionMLP,
 )
+from .pcn import (
+    PCNLayer,
+    PredictiveCodingNetwork,
+    train_pcn,
+)
 
 __all__ = [
     "CMLPQuaternionMLP",
@@ -22,4 +27,7 @@ __all__ = [
     "quaternion_mae_loss",
     "quaternion_sgd_step_",
     "scalar_regression_metrics",
+    "PCNLayer",
+    "PredictiveCodingNetwork",
+    "train_pcn",
 ]

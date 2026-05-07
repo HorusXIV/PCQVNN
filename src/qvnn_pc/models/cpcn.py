@@ -1,0 +1,1 @@
+""""Python implementation of Stenlund 2025 Predictive Coding Network for Machine Learning with Quaternions using Bill et al. 2023 CMLP Clifford Algebras (Cl 0,2 / Quaternions)"""
