@@ -1,0 +1,32 @@
+{
+  "benchmarks": [
+    "ackley",
+    "griewank",
+    "rastrigin",
+    "schwefel"
+  ],
+  "architectures": [
+    "cmlp",
+    "ghr"
+  ],
+  "layer_sizes": [
+    1,
+    5,
+    5,
+    5,
+    1
+  ],
+  "epochs": 5,
+  "repetitions": 2,
+  "dataset_size": 30000,
+  "sample_seed": 0,
+  "split_seed": 0,
+  "early_stopping": false,
+  "batch_size_override": null,
+  "hyperparameters_path": "/workspace/configs/hyperparameters.yml",
+  "results_root": "/workspace/results",
+  "run_name": "slurm_138915",
+  "summary_path": "/workspace/results/slurm_138915/architecture_comparison.csv",
+  "device": "cpu",
+  "dtype": "torch.float32"
+}
