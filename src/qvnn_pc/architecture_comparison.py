@@ -1,4 +1,4 @@
-"""Benchmark runner for comparing quaternion MLP architectures in this package."""
+"""Simple benchmark runner for the saved architecture-comparison experiments."""
 
 from __future__ import annotations
 
@@ -25,6 +25,10 @@ from qvnn_pc.models import (
 ArchitectureName = Literal["cmlp", "ghr"]
 DEFAULT_ARCHITECTURES: tuple[ArchitectureName, ...] = ("cmlp", "ghr")
 DEFAULT_BENCHMARKS: tuple[str, ...] = tuple(BENCHMARK_FUNCTIONS)
+DEFAULT_LAYER_SIZES: tuple[int, ...] = (1, 5, 5, 5, 1)
+DEFAULT_RESULTS_ROOT = Path("results")
+DEFAULT_HYPERPARAMETERS_PATH = default_hyperparameters_path()
+
 ARCHITECTURE_LABELS = {
     "cmlp": "CMLP",
     "ghr": "GHR",
@@ -35,17 +39,13 @@ ARCHITECTURE_LABELS = {
 class ArchitectureComparisonConfig:
     benchmarks: tuple[str, ...] = DEFAULT_BENCHMARKS
     architectures: tuple[ArchitectureName, ...] = DEFAULT_ARCHITECTURES
-    layer_sizes: tuple[int, ...] = (1, 5, 5, 5, 1)
-    epochs: int = 75
+    layer_sizes: tuple[int, ...] = DEFAULT_LAYER_SIZES
+    epochs: int = 5
     repetitions: int = 2
     dataset_size: int = 30_000
     sample_seed: int = 0
     split_seed: int = 0
     early_stopping: bool = True
-    batch_size: int | None = None
-    hyperparameters_path: Path = default_hyperparameters_path()
-    results_root: Path = Path("results")
-    run_name: str | None = None
     device: torch.device | str | None = None
     dtype: torch.dtype = torch.float32
 
@@ -97,7 +97,7 @@ def _build_model(
             generator=generator,
             device=device,
             dtype=dtype,
-    )
+        )
     raise ValueError(f"Unsupported architecture {architecture!r}.")
 
 
@@ -105,22 +105,18 @@ def _timestamped_run_name() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
-def _prepare_run_directory(config: ArchitectureComparisonConfig, output_path: Path | None) -> tuple[Path, Path]:
+def _prepare_run_directory(output_path: Path | None) -> tuple[Path, Path]:
     if output_path is not None:
         run_dir = output_path.parent
         summary_path = output_path
     else:
-        run_dir = config.results_root / (config.run_name or _timestamped_run_name())
+        run_dir = DEFAULT_RESULTS_ROOT / _timestamped_run_name()
         summary_path = run_dir / "architecture_comparison.csv"
 
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "models").mkdir(exist_ok=True)
     (run_dir / "history").mkdir(exist_ok=True)
     return run_dir, summary_path
-
-
-def _artifact_stem(benchmark: str, architecture: ArchitectureName, repetition: int) -> str:
-    return f"{benchmark}_{architecture}_rep{repetition:02d}"
 
 
 def _save_run_metadata(
@@ -139,10 +135,6 @@ def _save_run_metadata(
         "sample_seed": config.sample_seed,
         "split_seed": config.split_seed,
         "early_stopping": config.early_stopping,
-        "batch_size_override": config.batch_size,
-        "hyperparameters_path": str(config.hyperparameters_path),
-        "results_root": str(config.results_root),
-        "run_name": config.run_name,
         "summary_path": str(summary_path),
         "device": None if config.device is None else str(config.device),
         "dtype": str(config.dtype),
@@ -150,8 +142,8 @@ def _save_run_metadata(
     with (run_dir / "run_config.json").open("w", encoding="utf-8") as handle:
         json.dump(metadata, handle, indent=2)
 
-    if config.hyperparameters_path.exists():
-        shutil.copy2(config.hyperparameters_path, run_dir / "hyperparameters.yml")
+    if DEFAULT_HYPERPARAMETERS_PATH.exists():
+        shutil.copy2(DEFAULT_HYPERPARAMETERS_PATH, run_dir / "hyperparameters.yml")
 
 
 def _save_training_artifacts(
@@ -162,10 +154,12 @@ def _save_training_artifacts(
     repetition: int,
     model,
     history: dict[str, list[float] | float | int],
-    hyperparameters,
+    activation: str,
+    optimizer: str,
+    learning_rate: float,
     batch_size: int,
 ) -> None:
-    stem = _artifact_stem(benchmark, architecture, repetition)
+    stem = f"{benchmark}_{architecture}_rep{repetition:02d}"
     history_path = run_dir / "history" / f"{stem}.json"
     model_path = run_dir / "models" / f"{stem}.pt"
 
@@ -179,9 +173,9 @@ def _save_training_artifacts(
             "architecture": architecture,
             "repetition": repetition,
             "layer_sizes": list(model.layer_sizes),
-            "activation": hyperparameters.activation,
-            "optimizer": hyperparameters.optimizer,
-            "learning_rate": hyperparameters.lr,
+            "activation": activation,
+            "optimizer": optimizer,
+            "learning_rate": learning_rate,
             "batch_size": batch_size,
             "history_path": str(history_path),
             "checkpoint_note": "Model parameters restored to the best tracked validation checkpoint.",
@@ -213,9 +207,8 @@ def run_architecture_comparison(
             hyperparameters = get_model_hyperparameters(
                 architecture,
                 benchmark,
-                config_path=config.hyperparameters_path,
+                config_path=DEFAULT_HYPERPARAMETERS_PATH,
             )
-            batch_size = config.batch_size if config.batch_size is not None else hyperparameters.batch_size
 
             for repetition in range(1, config.repetitions + 1):
                 model = _build_model(
@@ -235,7 +228,7 @@ def run_architecture_comparison(
                     x_val=split.x_val,
                     y_val=split.y_val,
                     epochs=config.epochs,
-                    batch_size=batch_size,
+                    batch_size=hyperparameters.batch_size,
                     shuffle_generator=shuffle_generator,
                     early_stopping=config.early_stopping and architecture == "ghr",
                 )
@@ -243,6 +236,7 @@ def run_architecture_comparison(
                 test_pred = model.forward(split.x_test)
                 test_metrics = scalar_regression_metrics(test_pred, split.y_test)
                 test_qmae = float(quaternion_mae_loss(test_pred, split.y_test).detach().cpu())
+
                 if run_dir is not None:
                     _save_training_artifacts(
                         run_dir,
@@ -251,9 +245,12 @@ def run_architecture_comparison(
                         repetition=repetition,
                         model=model,
                         history=history,
-                        hyperparameters=hyperparameters,
-                        batch_size=batch_size,
+                        activation=hyperparameters.activation,
+                        optimizer=hyperparameters.optimizer,
+                        learning_rate=hyperparameters.lr,
+                        batch_size=hyperparameters.batch_size,
                     )
+
                 rows.append(
                     {
                         "repetition": repetition,
@@ -262,7 +259,7 @@ def run_architecture_comparison(
                         "learning_rate": hyperparameters.lr,
                         "optimizer": hyperparameters.optimizer,
                         "activation": hyperparameters.activation,
-                        "batch_size": batch_size,
+                        "batch_size": hyperparameters.batch_size,
                         "test_quaternion_mae": test_qmae,
                         "test_mse": test_metrics["mse"],
                         "test_mae": test_metrics["mae"],
@@ -309,11 +306,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--split-seed", type=int, default=0)
     parser.add_argument("--dtype", default="float32")
     parser.add_argument("--device", default=None)
-    parser.add_argument("--config", type=Path, default=default_hyperparameters_path())
-    parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--early-stopping", action="store_true")
-    parser.add_argument("--results-root", type=Path, default=Path("results"))
-    parser.add_argument("--run-name", default=None)
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
 
@@ -326,14 +319,10 @@ def main(argv: list[str] | None = None) -> int:
         sample_seed=args.sample_seed,
         split_seed=args.split_seed,
         early_stopping=args.early_stopping,
-        batch_size=args.batch_size,
-        hyperparameters_path=args.config,
-        results_root=args.results_root,
-        run_name=args.run_name,
         dtype=_dtype_from_name(args.dtype),
         device=args.device,
     )
-    run_dir, summary_path = _prepare_run_directory(config, args.output)
+    run_dir, summary_path = _prepare_run_directory(args.output)
     _save_run_metadata(run_dir, config, summary_path=summary_path)
     results = run_architecture_comparison(config, run_dir=run_dir)
     path = write_architecture_comparison(results, summary_path)

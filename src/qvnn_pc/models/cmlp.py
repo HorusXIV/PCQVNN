@@ -9,6 +9,8 @@ from typing import Literal
 import torch
 from torch import nn
 
+import tqdm
+
 from qvnn_pc.activations import (
     split_sigmoid,
     split_sigmoid_derivative,
@@ -344,7 +346,7 @@ class CMLPQuaternionMLP(nn.Module):
         best_state = self._clone_training_state()
         best_checkpoint_loss = math.inf
         start = time.perf_counter()
-        for _ in range(epochs):
+        for _ in tqdm.tqdm(range(epochs), desc="Training epochs", unit="epoch"):
             permutation = torch.randperm(
                 x_train.shape[0],
                 generator=shuffle_generator,
@@ -393,25 +395,3 @@ class CMLPQuaternionMLP(nn.Module):
         history["best_validation_loss"] = best_checkpoint_loss
         history["epochs_ran"] = len(history["quaternion_mae"])  # type: ignore[arg-type]
         return history
-
-    @torch.no_grad()
-    def fit_online_source_style(
-        self,
-        x_train: torch.Tensor,
-        y_train: torch.Tensor,
-        *,
-        x_val: torch.Tensor | None = None,
-        y_val: torch.Tensor | None = None,
-        epochs: int = 1,
-        shuffle_generator: torch.Generator | None = None,
-    ) -> dict[str, list[float] | float | int]:
-        """Compatibility wrapper for the original sample-wise training behavior."""
-        return self.fit(
-            x_train,
-            y_train,
-            x_val=x_val,
-            y_val=y_val,
-            epochs=epochs,
-            batch_size=1,
-            shuffle_generator=shuffle_generator,
-        )
