@@ -7,10 +7,13 @@ from dataclasses import dataclass
 from datetime import datetime
 import json
 from pathlib import Path
+import signal
 import shutil
+import time
 from typing import Literal
 
 import pandas as pd
+from pandas.errors import EmptyDataError
 import torch
 
 from qvnn_pc.config import default_hyperparameters_path, get_model_hyperparameters
@@ -21,6 +24,7 @@ from qvnn_pc.models import (
     quaternion_mae_loss,
     scalar_regression_metrics,
 )
+from qvnn_pc.models.shared import pq_alpha_should_stop as _pq_alpha_should_stop
 
 ArchitectureName = Literal["cmlp", "ghr"]
 DEFAULT_ARCHITECTURES: tuple[ArchitectureName, ...] = ("cmlp", "ghr")
@@ -33,6 +37,7 @@ ARCHITECTURE_LABELS = {
     "cmlp": "CMLP",
     "ghr": "GHR",
 }
+_STOP_REQUESTED = False
 
 
 @dataclass(frozen=True)
@@ -41,13 +46,20 @@ class ArchitectureComparisonConfig:
     architectures: tuple[ArchitectureName, ...] = DEFAULT_ARCHITECTURES
     layer_sizes: tuple[int, ...] = DEFAULT_LAYER_SIZES
     epochs: int = 5
-    repetitions: int = 
+    repetitions: int = 2
     dataset_size: int = 30_000
     sample_seed: int = 0
     split_seed: int = 0
     early_stopping: bool = True
     device: torch.device | str | None = None
     dtype: torch.dtype = torch.float32
+
+
+def _request_stop(signum, _frame) -> None:
+    global _STOP_REQUESTED
+    _STOP_REQUESTED = True
+    signal_name = signal.Signals(signum).name
+    print(f"Received {signal_name}. Saving progress after the current batch.")
 
 
 def _canonical_benchmark_name(name: str) -> str:
@@ -184,12 +196,202 @@ def _save_training_artifacts(
     )
 
 
+def _checkpoint_path(run_dir: Path, benchmark: str, architecture: ArchitectureName, repetition: int) -> Path:
+    return run_dir / "checkpoints" / f"{benchmark}_{architecture}_rep{repetition:02d}.pt"
+
+
+def _clone_state_dict(model) -> dict[str, torch.Tensor]:
+    return {name: tensor.detach().cpu().clone() for name, tensor in model.state_dict().items()}
+
+
+def _save_resume_checkpoint(
+    checkpoint_path: Path,
+    *,
+    model,
+    best_state_dict: dict[str, torch.Tensor],
+    history: dict[str, list[float] | float | int],
+    epoch_index: int,
+    next_batch_start: int,
+    permutation: torch.Tensor | None,
+    best_validation_loss: float,
+    shuffle_generator: torch.Generator,
+    runtime_seconds: float,
+    interrupted: bool,
+) -> None:
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(
+        {
+            "model_state_dict": model.state_dict(),
+            "best_state_dict": best_state_dict,
+            "history": history,
+            "epoch_index": epoch_index,
+            "next_batch_start": next_batch_start,
+            "permutation": None if permutation is None else permutation.detach().cpu().clone(),
+            "best_validation_loss": best_validation_loss,
+            "shuffle_generator_state": shuffle_generator.get_state(),
+            "runtime_seconds": runtime_seconds,
+            "interrupted": interrupted,
+        },
+        checkpoint_path,
+    )
+
+
+def _fit_with_resume(
+    model,
+    *,
+    x_train: torch.Tensor,
+    y_train: torch.Tensor,
+    x_val: torch.Tensor,
+    y_val: torch.Tensor,
+    epochs: int,
+    batch_size: int,
+    shuffle_generator: torch.Generator,
+    early_stopping: bool,
+    checkpoint_path: Path | None,
+) -> dict[str, list[float] | float | int]:
+    global _STOP_REQUESTED
+    history: dict[str, list[float] | float | int] = {
+        "quaternion_mae": [],
+        "validation_quaternion_mae": [],
+        "mape": [],
+        "r2": [],
+    }
+    best_state_dict = _clone_state_dict(model)
+    best_validation_loss = float("inf")
+    start_epoch = 0
+    next_batch_start = 0
+    pending_permutation: torch.Tensor | None = None
+    runtime_seconds = 0.0
+
+    if checkpoint_path is not None and checkpoint_path.exists():
+        checkpoint = torch.load(checkpoint_path, map_location="cpu")
+        model.load_state_dict(checkpoint["model_state_dict"])
+        best_state_dict = checkpoint["best_state_dict"]
+        history = checkpoint["history"]
+        start_epoch = int(checkpoint.get("epoch_index", len(history["quaternion_mae"])))  # type: ignore[index]
+        next_batch_start = int(checkpoint.get("next_batch_start", 0))
+        pending_permutation = checkpoint.get("permutation")
+        best_validation_loss = float(checkpoint["best_validation_loss"])
+        shuffle_generator.set_state(checkpoint["shuffle_generator_state"])
+        runtime_seconds = float(checkpoint.get("runtime_seconds", 0.0))
+        if next_batch_start > 0:
+            print(f"Resuming {checkpoint_path.name} from epoch {start_epoch + 1}, batch offset {next_batch_start}.")
+        else:
+            print(f"Resuming {checkpoint_path.name} from epoch {start_epoch + 1}.")
+
+    start_time = time.perf_counter()
+
+    for epoch_idx in range(start_epoch, epochs):
+        if epoch_idx == start_epoch and pending_permutation is not None:
+            permutation = pending_permutation
+        else:
+            permutation = torch.randperm(
+                x_train.shape[0],
+                generator=shuffle_generator,
+                device="cpu",
+            )
+
+        batch_starts = range(next_batch_start, x_train.shape[0], batch_size)
+        for batch_start in batch_starts:
+            batch_indices = permutation[batch_start:batch_start + batch_size]
+            model.train_step(x_train[batch_indices], y_train[batch_indices])
+            if _STOP_REQUESTED:
+                elapsed = runtime_seconds + (time.perf_counter() - start_time)
+                if checkpoint_path is not None:
+                    _save_resume_checkpoint(
+                        checkpoint_path,
+                        model=model,
+                        best_state_dict=best_state_dict,
+                        history=history,
+                        epoch_index=epoch_idx,
+                        next_batch_start=batch_start + batch_size,
+                        permutation=permutation,
+                        best_validation_loss=best_validation_loss,
+                        shuffle_generator=shuffle_generator,
+                        runtime_seconds=elapsed,
+                        interrupted=True,
+                    )
+                history["runtime"] = elapsed
+                history["best_validation_loss"] = best_validation_loss
+                history["epochs_ran"] = len(history["quaternion_mae"])  # type: ignore[arg-type]
+                history["interrupted"] = True
+                return history
+
+        train_pred = model.forward(x_train)
+        train_qmae = float(quaternion_mae_loss(train_pred, y_train).detach().cpu())
+        train_metrics = scalar_regression_metrics(train_pred, y_train)
+
+        val_pred = model.forward(x_val)
+        validation_loss = float(quaternion_mae_loss(val_pred, y_val).detach().cpu())
+
+        history["quaternion_mae"].append(train_qmae)  # type: ignore[index]
+        history["validation_quaternion_mae"].append(validation_loss)  # type: ignore[index]
+        history["mape"].append(train_metrics["mape"])  # type: ignore[index]
+        history["r2"].append(train_metrics["r2"])  # type: ignore[index]
+
+        if validation_loss < best_validation_loss:
+            best_validation_loss = validation_loss
+            best_state_dict = _clone_state_dict(model)
+
+        epochs_completed = epoch_idx + 1
+        elapsed = runtime_seconds + (time.perf_counter() - start_time)
+        if checkpoint_path is not None:
+            _save_resume_checkpoint(
+                checkpoint_path,
+                model=model,
+                best_state_dict=best_state_dict,
+                history=history,
+                epoch_index=epochs_completed,
+                next_batch_start=0,
+                permutation=None,
+                best_validation_loss=best_validation_loss,
+                shuffle_generator=shuffle_generator,
+                runtime_seconds=elapsed,
+                interrupted=False,
+            )
+
+        if early_stopping and _pq_alpha_should_stop(
+            history["quaternion_mae"],  # type: ignore[arg-type]
+            validation_loss,
+            best_validation_loss,
+            window=5,
+            threshold=0.5,
+        ):
+            break
+
+        if not torch.isfinite(torch.tensor(train_qmae)):
+            break
+
+        next_batch_start = 0
+        pending_permutation = None
+
+    model.load_state_dict(best_state_dict)
+    history["runtime"] = runtime_seconds + (time.perf_counter() - start_time)
+    history["best_validation_loss"] = best_validation_loss
+    history["epochs_ran"] = len(history["quaternion_mae"])  # type: ignore[arg-type]
+    history["interrupted"] = False
+    return history
+
+
 def run_architecture_comparison(
     config: ArchitectureComparisonConfig = ArchitectureComparisonConfig(),
     *,
     run_dir: Path | None = None,
+    existing_results: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
+    global _STOP_REQUESTED
     rows: list[dict[str, float | int | str]] = []
+    completed: set[tuple[str, str, int]] = set()
+
+    if existing_results is not None and not existing_results.empty:
+        rows.extend(existing_results.to_dict("records"))
+        completed = {
+            (str(row.test_function), str(row.algorithm), int(row.repetition))
+            for row in existing_results.itertuples(index=False)
+        }
+
+    if run_dir is not None:
+        (run_dir / "checkpoints").mkdir(exist_ok=True)
 
     for benchmark_idx, benchmark_name in enumerate(config.benchmarks):
         benchmark = _canonical_benchmark_name(benchmark_name)
@@ -211,6 +413,11 @@ def run_architecture_comparison(
             )
 
             for repetition in range(1, config.repetitions + 1):
+                result_key = (benchmark, ARCHITECTURE_LABELS[architecture], repetition)
+                if result_key in completed:
+                    print(f"Skipping completed run: {benchmark} {ARCHITECTURE_LABELS[architecture]} rep {repetition}.")
+                    continue
+
                 model = _build_model(
                     architecture,
                     activation=hyperparameters.activation,
@@ -222,16 +429,25 @@ def run_architecture_comparison(
                     dtype=config.dtype,
                 )
                 shuffle_generator = torch.Generator(device="cpu").manual_seed(int(repetition * 1e6))
-                history = model.fit(
-                    split.x_train,
-                    split.y_train,
+                checkpoint_path = None if run_dir is None else _checkpoint_path(run_dir, benchmark, architecture, repetition)
+                history = _fit_with_resume(
+                    model,
+                    x_train=split.x_train,
+                    y_train=split.y_train,
                     x_val=split.x_val,
                     y_val=split.y_val,
                     epochs=config.epochs,
                     batch_size=hyperparameters.batch_size,
                     shuffle_generator=shuffle_generator,
-                    early_stopping=config.early_stopping and architecture == "ghr",
+                    early_stopping=config.early_stopping,
+                    checkpoint_path=checkpoint_path,
                 )
+                if history.get("interrupted"):
+                    print("Training paused after checkpoint save. Returning partial results for resume.")
+                    results = pd.DataFrame(rows)
+                    if results.empty:
+                        return results
+                    return results.sort_values(["test_function", "algorithm", "repetition"]).reset_index(drop=True)
 
                 test_pred = model.forward(split.x_test)
                 test_metrics = scalar_regression_metrics(test_pred, split.y_test)
@@ -250,6 +466,8 @@ def run_architecture_comparison(
                         learning_rate=hyperparameters.lr,
                         batch_size=hyperparameters.batch_size,
                     )
+                if checkpoint_path is not None and checkpoint_path.exists():
+                    checkpoint_path.unlink()
 
                 rows.append(
                     {
@@ -269,8 +487,12 @@ def run_architecture_comparison(
                         "runtime_seconds": float(history["runtime"]),
                     }
                 )
+                completed.add(result_key)
 
-    return pd.DataFrame(rows)
+    results = pd.DataFrame(rows)
+    if results.empty:
+        return results
+    return results.sort_values(["test_function", "algorithm", "repetition"]).reset_index(drop=True)
 
 
 def write_architecture_comparison(results: pd.DataFrame, output_path: str | Path) -> Path:
@@ -296,6 +518,11 @@ def _dtype_from_name(name: str) -> torch.dtype:
 
 
 def main(argv: list[str] | None = None) -> int:
+    global _STOP_REQUESTED
+    _STOP_REQUESTED = False
+    signal.signal(signal.SIGUSR1, _request_stop)
+    signal.signal(signal.SIGTERM, _request_stop)
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--benchmarks", nargs="*", default=list(DEFAULT_BENCHMARKS))
     parser.add_argument("--architectures", nargs="*", default=list(DEFAULT_ARCHITECTURES))
@@ -306,7 +533,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--split-seed", type=int, default=0)
     parser.add_argument("--dtype", default="float32")
     parser.add_argument("--device", default=None)
-    parser.add_argument("--early-stopping", action="store_true")
+    parser.add_argument("--no-early-stopping", action="store_true")
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
 
@@ -318,13 +545,20 @@ def main(argv: list[str] | None = None) -> int:
         dataset_size=args.dataset_size,
         sample_seed=args.sample_seed,
         split_seed=args.split_seed,
-        early_stopping=args.early_stopping,
+        early_stopping=not args.no_early_stopping,
         dtype=_dtype_from_name(args.dtype),
         device=args.device,
     )
     run_dir, summary_path = _prepare_run_directory(args.output)
     _save_run_metadata(run_dir, config, summary_path=summary_path)
-    results = run_architecture_comparison(config, run_dir=run_dir)
+    if summary_path.exists():
+        try:
+            existing_results = pd.read_csv(summary_path)
+        except EmptyDataError:
+            existing_results = None
+    else:
+        existing_results = None
+    results = run_architecture_comparison(config, run_dir=run_dir, existing_results=existing_results)
     path = write_architecture_comparison(results, summary_path)
     print(f"Wrote {len(results)} rows to {path}.")
     print(f"Saved run artifacts to {run_dir}.")
