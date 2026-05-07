@@ -41,7 +41,7 @@ class ArchitectureComparisonConfig:
     architectures: tuple[ArchitectureName, ...] = DEFAULT_ARCHITECTURES
     layer_sizes: tuple[int, ...] = DEFAULT_LAYER_SIZES
     epochs: int = 5
-    repetitions: int = 2
+    repetitions: int = 
     dataset_size: int = 30_000
     sample_seed: int = 0
     split_seed: int = 0
