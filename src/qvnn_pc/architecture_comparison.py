@@ -45,14 +45,31 @@ class ArchitectureComparisonConfig:
     benchmarks: tuple[str, ...] = DEFAULT_BENCHMARKS
     architectures: tuple[ArchitectureName, ...] = DEFAULT_ARCHITECTURES
     layer_sizes: tuple[int, ...] = DEFAULT_LAYER_SIZES
-    epochs: int = 5
-    repetitions: int = 2
+    epochs: int = 250
+    repetitions: int = 30
     dataset_size: int = 30_000
     sample_seed: int = 0
     split_seed: int = 0
     early_stopping: bool = True
     device: torch.device | str | None = None
     dtype: torch.dtype = torch.float32
+
+
+# Edit this block for the runs you actually want to launch from this script.
+# The values below mirror the reduced capsule-style comparison setup.
+SCRIPT_CONFIG = ArchitectureComparisonConfig(
+    benchmarks=DEFAULT_BENCHMARKS,
+    architectures=DEFAULT_ARCHITECTURES,
+    layer_sizes=DEFAULT_LAYER_SIZES,
+    epochs=100,
+    repetitions=5,
+    dataset_size=30_000,
+    sample_seed=0,
+    split_seed=0,
+    early_stopping=True,
+    device="cpu",
+    dtype=torch.float32,
+)
 
 
 def _request_stop(signum, _frame) -> None:
@@ -505,50 +522,17 @@ def write_architecture_comparison(results: pd.DataFrame, output_path: str | Path
     return output
 
 
-def _dtype_from_name(name: str) -> torch.dtype:
-    lookup = {
-        "float32": torch.float32,
-        "float64": torch.float64,
-    }
-    try:
-        return lookup[name.lower()]
-    except KeyError as exc:
-        valid = ", ".join(sorted(lookup))
-        raise ValueError(f"Unsupported dtype {name!r}. Expected one of: {valid}.") from exc
-
-
 def main(argv: list[str] | None = None) -> int:
     global _STOP_REQUESTED
     _STOP_REQUESTED = False
     signal.signal(signal.SIGUSR1, _request_stop)
     signal.signal(signal.SIGTERM, _request_stop)
 
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--benchmarks", nargs="*", default=list(DEFAULT_BENCHMARKS))
-    parser.add_argument("--architectures", nargs="*", default=list(DEFAULT_ARCHITECTURES))
-    parser.add_argument("--epochs", type=int, default=5)
-    parser.add_argument("--repetitions", type=int, default=2)
-    parser.add_argument("--dataset-size", type=int, default=30_000)
-    parser.add_argument("--sample-seed", type=int, default=0)
-    parser.add_argument("--split-seed", type=int, default=0)
-    parser.add_argument("--dtype", default="float32")
-    parser.add_argument("--device", default=None)
-    parser.add_argument("--no-early-stopping", action="store_true")
+    parser = argparse.ArgumentParser(description="Run the saved architecture comparison with in-file settings.")
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
 
-    config = ArchitectureComparisonConfig(
-        benchmarks=tuple(args.benchmarks),
-        architectures=tuple(_canonical_architecture_name(name) for name in args.architectures),
-        epochs=args.epochs,
-        repetitions=args.repetitions,
-        dataset_size=args.dataset_size,
-        sample_seed=args.sample_seed,
-        split_seed=args.split_seed,
-        early_stopping=not args.no_early_stopping,
-        dtype=_dtype_from_name(args.dtype),
-        device=args.device,
-    )
+    config = SCRIPT_CONFIG
     run_dir, summary_path = _prepare_run_directory(args.output)
     _save_run_metadata(run_dir, config, summary_path=summary_path)
     if summary_path.exists():

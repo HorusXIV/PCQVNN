@@ -14,7 +14,6 @@ set -euo pipefail
 PROJECT_ROOT="${PROJECT_ROOT:-$SLURM_SUBMIT_DIR}"
 CONTAINER_IMAGE="${CONTAINER_IMAGE:-$PROJECT_ROOT/cluster/pcqvnn.sif}"
 RESULTS_ROOT="${RESULTS_ROOT:-$PROJECT_ROOT/results}"
-DEVICE="${DEVICE:-cpu}"
 
 mkdir -p "$RESULTS_ROOT" "$PROJECT_ROOT/logs"
 
@@ -72,7 +71,6 @@ timeout --signal=SIGUSR1 23h50m \
     --bind "$PROJECT_ROOT:/workspace" \
     "$CONTAINER_IMAGE" \
     python -m qvnn_pc.architecture_comparison \
-    --device "$DEVICE" \
     --output "$OUTPUT_PATH_IN_CONTAINER" \
     "$@" &
 CHILD_PID=$!
