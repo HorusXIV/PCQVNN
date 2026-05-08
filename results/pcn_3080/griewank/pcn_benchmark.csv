@@ -1,0 +1,2 @@
+repetition,algorithm,test_function,activation,layer_dims,batch_size,eta_infer,eta_learn,T_infer_train,T_infer_eval,T_learn,latent_init,test_mse,test_mae,test_mape,test_r2,test_free_energy,test_reconstruction_mse,test_supervised_mse,epochs,runtime_seconds
+1,PCN,griewank,tanh,4-20-20-20-20,512,0.05,0.001,24,32,1,feedforward,17641.3984375,121.36325073242188,0.9999777674674988,-5.057419300079346,8820.7255859375,0.052659839391708374,17641.3984375,250,211.4636977710761
