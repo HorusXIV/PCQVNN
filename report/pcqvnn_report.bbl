@@ -250,8 +250,51 @@
       \verb https://arxiv.org/abs/2506.06332
       \endverb
     \endentry
+    \entry{xu2015enabling}{article}{}
+      \name{author}{4}{}{%
+        {{hash=50bb51d49b94c510179c72fdc4868b8b}{%
+           family={Xu},
+           familyi={X\bibinitperiod},
+           given={Dongpo},
+           giveni={D\bibinitperiod}}}%
+        {{hash=9aabe2bbb1f0a1ed7169264184cd9b54}{%
+           family={Jahanchahi},
+           familyi={J\bibinitperiod},
+           given={C.},
+           giveni={C\bibinitperiod}}}%
+        {{hash=8fdddc3247a29d7aecd98b6601d26a7c}{%
+           family={Took},
+           familyi={T\bibinitperiod},
+           given={Clive\bibnamedelima C.},
+           giveni={C\bibinitperiod\bibinitdelim C\bibinitperiod}}}%
+        {{hash=f65d461df3311f7d46f2831ecb66fabf}{%
+           family={Mandic},
+           familyi={M\bibinitperiod},
+           given={Danilo\bibnamedelima P.},
+           giveni={D\bibinitperiod\bibinitdelim P\bibinitperiod}}}%
+      }
+      \strng{namehash}{10779ff8af5f3cf00af61f7e9a3c9c76}
+      \strng{fullhash}{8b44b8d7883e32ddd40258ce560d1c04}
+      \strng{bibnamehash}{8b44b8d7883e32ddd40258ce560d1c04}
+      \strng{authorbibnamehash}{8b44b8d7883e32ddd40258ce560d1c04}
+      \strng{authornamehash}{10779ff8af5f3cf00af61f7e9a3c9c76}
+      \strng{authorfullhash}{8b44b8d7883e32ddd40258ce560d1c04}
+      \field{sortinit}{9}
+      \field{sortinithash}{0a5ebc79d83c96b6579069544c73c7d4}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Royal Society Open Science}
+      \field{number}{8}
+      \field{title}{Enabling Quaternion Derivatives: The Generalized HR Calculus}
+      \field{volume}{2}
+      \field{year}{2015}
+      \field{pages}{150255}
+      \range{pages}{1}
+      \verb{doi}
+      \verb 10.1098/rsos.150255
+      \endverb
+    \endentry
   \enddatalist
-  \missing{xu2015enabling}
 \endrefsection
 \endinput
 

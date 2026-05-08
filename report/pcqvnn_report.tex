@@ -3,6 +3,17 @@
 
 \usepackage{amsfonts,amssymb}
 
+\usepackage[
+  activate={true,nocompatibility}, % Aktiviert Protrusion und Expansion
+  final,                          % Sorgt dafür, dass microtype auch im Draft-Modus aktiv ist
+  tracking=true,                  % Aktiviert das Letterspacing (Tracking)
+  kerning=true,                   % Aktiviert zusätzliches Kerning
+  spacing=true,                   % Optimiert die Abstände zwischen Wörtern
+  factor=1100,                    % Erhöht den Protrusion-Effekt leicht (Standard: 1000)
+  stretch=10,                     % Begrenzt die Schriftausdehnung (Standard: 20)
+  shrink=10                       % Begrenzt die Schriftschrumpfung (Standard: 20)
+]{microtype}
+
 \newcommand{\logofilename}{FHNW_HSI_DE}
 
 \usepackage[style=ieee,urldate=comp,backend=biber]{biblatex}

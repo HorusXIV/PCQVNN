@@ -1,14 +1,14 @@
 # Fdb version 4
-["biber pcqvnn_report"] 1778263192.30218 "pcqvnn_report.bcf" "pcqvnn_report.bbl" "pcqvnn_report" 1778263369.85984 0
-  "literature/Citations.bib" 1778261031.01186 3486 2104993a5c2b79c8a3a7385fb6101125 ""
-  "pcqvnn_report.bcf" 1778263369.7426 108404 304e83a864b54c0ea57928eae184125b "pdflatex"
+["biber pcqvnn_report"] 1778265932.20729 "pcqvnn_report.bcf" "pcqvnn_report.bbl" "pcqvnn_report" 1778266083.83633 0
+  "literature/Citations.bib" 1778265952.36569 4902 4451c15fda284c5a480d3a240eb5fa08 ""
+  "pcqvnn_report.bcf" 1778266083.73268 108404 304e83a864b54c0ea57928eae184125b "pdflatex"
   (generated)
   "pcqvnn_report.bbl"
   "pcqvnn_report.blg"
   (rewritten before read)
-["pdflatex"] 1778263368.71301 "/home/lukas/src/Sem4/OML/oml_fs2026/PCQVNN/report/pcqvnn_report.tex" "pcqvnn_report.pdf" "pcqvnn_report" 1778263369.86007 2
+["pdflatex"] 1778266082.61481 "/home/lukas/src/Sem4/OML/oml_fs2026/PCQVNN/report/pcqvnn_report.tex" "pcqvnn_report.pdf" "pcqvnn_report" 1778266083.83659 0
   "/etc/texmf/web2c/texmf.cnf" 1771235181.68999 475 c0e671620eb5563b2130f56340a5fde8 ""
-  "/home/lukas/src/Sem4/OML/oml_fs2026/PCQVNN/report/pcqvnn_report.tex" 1778263191.02433 1289 fd753b6f3348b0517898582b4b2d6051 ""
+  "/home/lukas/src/Sem4/OML/oml_fs2026/PCQVNN/report/pcqvnn_report.tex" 1778266082.40667 1959 dfa401e32c253a786de81db7b946b954 ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/adobe/times/ptmr8t.tfm" 1136768653 6672 e3ab9e37e925f3045c9005e6d1473d56 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/symbols/msam10.tfm" 1246382020 916 f87d7c45f9c908e672703b83b72241a3 ""
@@ -173,6 +173,12 @@
   "/usr/share/texlive/texmf-dist/tex/latex/logreq/logreq.def" 1284153563 1620 fb1c32b818f2058eca187e5c41dfae77 ""
   "/usr/share/texlive/texmf-dist/tex/latex/logreq/logreq.sty" 1284153563 6187 b27afc771af565d3a9ff1ca7d16d0d46 ""
   "/usr/share/texlive/texmf-dist/tex/latex/mdwtools/footnote.sty" 1137110333 6005 dcbae7bf04efc282d256f60986bb2c15 ""
+  "/usr/share/texlive/texmf-dist/tex/latex/microtype/microtype-pdftex.def" 1678741534 48246 c3eed060aba663f58af3ff756e83f2bd ""
+  "/usr/share/texlive/texmf-dist/tex/latex/microtype/microtype.cfg" 1678741534 26842 05a01d67d23e805520393a049533b8c0 ""
+  "/usr/share/texlive/texmf-dist/tex/latex/microtype/microtype.sty" 1678741534 98531 f79ec363f3014ada2cb766715926ecc9 ""
+  "/usr/share/texlive/texmf-dist/tex/latex/microtype/mt-cmr.cfg" 1678741534 22906 7a8d9f8766e60f694cdde7648421c2ab ""
+  "/usr/share/texlive/texmf-dist/tex/latex/microtype/mt-msa.cfg" 1678741534 5929 0e1d31c98c10fece90f470d5746ecdd6 ""
+  "/usr/share/texlive/texmf-dist/tex/latex/microtype/mt-msb.cfg" 1678741534 5594 45ca1ba048c2fa6267d5419cc463d804 ""
   "/usr/share/texlive/texmf-dist/tex/latex/multirow/multirow.sty" 1615845910 6149 2398eec4faa1ee24ff761581e580ecf1 ""
   "/usr/share/texlive/texmf-dist/tex/latex/pdflscape/pdflscape-nometadata.sty" 1667072951 6572 ea530fbbe537629fd97736d33babc07d ""
   "/usr/share/texlive/texmf-dist/tex/latex/pdflscape/pdflscape.sty" 1667072951 2224 1230ab76aa62221ccbd90bca8c8c015e ""
@@ -242,7 +248,6 @@
   "/usr/share/texmf/fonts/tfm/public/lm/ts1-lmr10.tfm" 1254269338 1556 b86d923e6b2f9aab2e313098a95cb0b8 ""
   "/usr/share/texmf/fonts/type1/public/lm/lmbx10.pfb" 1255129361 121021 1bf809ce4a594679006bd72263eba59b ""
   "/usr/share/texmf/fonts/type1/public/lm/lmbx12.pfb" 1255129361 116908 1fca96723793882c2e0160350c192fc8 ""
-  "/usr/share/texmf/fonts/type1/public/lm/lmbx8.pfb" 1255129361 125241 1d6de6a4ab0d08571b46009b6426dace ""
   "/usr/share/texmf/fonts/type1/public/lm/lmcsc10.pfb" 1255129361 116427 4a5b1ccaa7cce719091920a86b58608d ""
   "/usr/share/texmf/fonts/type1/public/lm/lmex10.pfb" 1254269338 23055 2e5b42921de910eaa97b85df04ca4891 ""
   "/usr/share/texmf/fonts/type1/public/lm/lmmi10.pfb" 1254269338 30388 702fae6a5f0e6e9c48a1d872b442ffcf ""
@@ -275,15 +280,16 @@
   "fhnwreport.cls" 1778246679.95747 6398 9e23193f5e7e35e16db58498a0a680a3 ""
   "graphics/FHNW_HSI_DE.pdf" 1778246679.88399 41408 2ee6bd26b48aa7c952bfc59f5c00a1a5 ""
   "graphics/titleimage.png" 1778246679.88579 60530 6be0157bb77547173c3f87d7b85110e1 ""
-  "pcqvnn_report.aux" 1778263369.7386 3704 2370de009a507450475b347181eebc2b "pdflatex"
-  "pcqvnn_report.bbl" 1778263192.80882 10390 98e65df139482b372c8af9d4b56242a8 "biber pcqvnn_report"
-  "pcqvnn_report.out" 1778263369.7406 1920 f31b7da298bf58f6b940c490f0352e17 "pdflatex"
-  "pcqvnn_report.tex" 1778263191.02433 1289 fd753b6f3348b0517898582b4b2d6051 ""
+  "pcqvnn_report.aux" 1778266083.72908 3781 0ba74ff751f164277263ee7be631c114 "pdflatex"
+  "pcqvnn_report.bbl" 1778265932.72284 12121 c4a587407df309730d2fa89595f2efa4 "biber pcqvnn_report"
+  "pcqvnn_report.out" 1778266083.73068 1920 f31b7da298bf58f6b940c490f0352e17 "pdflatex"
+  "pcqvnn_report.run.xml" 1778266083.73498 2536 bf3ef76c3083ee6dbedcfb9c6f2852cb "pdflatex"
+  "pcqvnn_report.tex" 1778266082.40667 1959 dfa401e32c253a786de81db7b946b954 ""
   "sections/abstract.tex" 1778259331.42413 549 69d29562988c648218cb6bb20cc1ed2d ""
   "sections/architektur.tex" 1778263172.93727 34 5bc05786094723c2a4e7e4f2724a842f ""
   "sections/einleitung.tex" 1778263308.38994 5106 abae26ab73207b247da3874c0fc82caa ""
   "sections/experimente.tex" 1778263165.58017 34 11c2d94781359fc3641c13a5820b7ade ""
-  "sections/grundlagen.tex" 1778263367.25458 15862 cd0122d16f82682f43d3c31563c22064 ""
+  "sections/grundlagen.tex" 1778265952.36569 15811 169f8e76d1c4c934de2b7bf4cf8a34bf ""
   "sections/schluss.tex" 1778263235.69258 47 a54df5076c75a94b5e66ceff7a24777a ""
   (generated)
   "pcqvnn_report.aux"

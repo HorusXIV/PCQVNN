@@ -105,14 +105,15 @@ Eine vereinfachte Form der GHR Ableitungen ist
 \frac{1}{4}
 \left(
 \frac{\partial f}{\partial q_0}
- 
++
 \frac{\partial f}{\partial q_1}\mathbf{i}
- 
++
 \frac{\partial f}{\partial q_2}\mathbf{j}
- 
++
 \frac{\partial f}{\partial q_3}\mathbf{k}
 \right),
 \]
+
 \[
 \frac{\partial f}{\partial q^*}
 =
@@ -214,16 +215,12 @@ Für eine latente Schicht $1 \leq l \leq L$ kann der Inferenzschritt als Gradien
 x^{(l)}
 \leftarrow
 x^{(l)}
- 
-\eta_{\text{infer}}
 \left[
 \varepsilon^{(l)}
- 
-\left(W^{(l 1)}\right)^\top
 \left(
-f^{(l 1)\prime}(a^{(l 1)})
+f^{(l+1)\prime}(a^{(l+1)})
 \odot
-\varepsilon^{(l 1)}
+\varepsilon^{(l+1)}
 \right)
 \right].
 \]
