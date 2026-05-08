@@ -1,0 +1,58 @@
+\documentclass[final,twocolumn]{fhnwreport}
+\input{fhnwheader}
+
+\usepackage{amsfonts,amssymb}
+
+\newcommand{\logofilename}{FHNW_HSI_DE}
+
+\usepackage[style=ieee,urldate=comp,backend=biber]{biblatex}
+\addbibresource{literature/Citations.bib}
+
+\title{Quaternion-Valued Neural Networks and Predictive Coding}
+\author{Lukas Breiter}
+\date{Windisch, Mai 2026}
+
+\begin{document}
+
+\pagenumbering{roman}
+
+\selectlanguage{ngerman}
+\onecolumn
+\thispagestyle{empty}
+\begin{center}
+\includegraphics[height=12mm]{\logofilename}\\[2.0cm]
+{\Large\bfseries FHNW Hochschule für Technik und Umwelt}\\[0.6cm]
+{\LARGE\bfseries Quaternion-Valued Neural Networks and Predictive Coding}\\[0.8cm]
+{\large Projektbericht im Modul OML}\\[1.2cm]
+\begin{tabular}{@{}ll@{}}
+Student: & Lukas Breiter\\
+Fachexperte: & Michael Graber\\
+Datum: & Windisch, Mai 2026\\
+\end{tabular}
+\end{center}
+
+\vfill
+\begin{center}
+\includegraphics[width=0.9\textwidth]{graphics/titleimage.png}
+\end{center}
+
+\input{sections/abstract}
+\clearpage
+
+\twocolumn
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\input{sections/einleitung}
+\input{sections/grundlagen}
+\input{sections/architektur}
+\input{sections/experimente}
+\input{sections/schluss}
+
+
+\
+{\sloppypar
+\printbibliography[heading=bibintoc, title=Quellenverzeichnis]
+}
+
+
+\end{document}

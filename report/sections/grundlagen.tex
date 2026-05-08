@@ -1,0 +1,289 @@
+\section{Grundlagen}
+
+Dieses Kapitel führt die zentralen mathematischen und algorithmischen Grundlagen ein, die für das Projekt benötigt werden. Zuerst wird die Verbindung zwischen Quaternionen, Clifford Algebren und quaternionwertigen neuronalen Netzwerken beschrieben. Danach wird das Generalized Hamilton Real Kalkül (GHR Kalkül) als eine Möglichkeit zur Ableitung quaternionwertiger Funktionen eingeführt. Abschliessend werden Predictive Coding Networks (PCNs) erklärt. PCNs werden dabei nicht als ein reiner Optimierer wie ein genetischer Algorithmus oder Adam verstanden, sondern als eigene Netzwerk - und Lernarchitektur, bei der interne Zustände iterativ inferiert und Gewichte anschliessend angepasst werden.
+
+\subsection{Clifford Algebra und quaternionwertige neuronale Netzwerke}
+
+Quaternionen gehören zu den hyperkomplexen Zahlensystemen. Sie erweitern die reellen und komplexen Zahlen, indem ein einzelnes Element vier reelle Komponenten enthält:
+\[
+q = q_0 + q_1\mathbf{i} + q_2\mathbf{j} + q_3\mathbf{k},
+\]
+wobei $q_0,q_1,q_2,q_3 \in \mathbb{R}$ sind. Die Komponente $q_0$ wird als Realteil bezeichnet, während $q_1,q_2,q_3$ die imaginären Komponenten bilden. Die Basiselemente erfüllen
+\[
+\mathbf{i}^2 = \mathbf{j}^2 = \mathbf{k}^2 =  1
+\]
+sowie
+\[
+\mathbf{i}\mathbf{j} = \mathbf{k}, \qquad
+\mathbf{j}\mathbf{k} = \mathbf{i}, \qquad
+\mathbf{k}\mathbf{i} = \mathbf{j}.
+\]
+Wird die Reihenfolge vertauscht, ändert sich jeweils das Vorzeichen, z.B.
+\[
+\mathbf{j}\mathbf{i} =  \mathbf{k}.
+\]
+Die Multiplikation von Quaternionen ist deshalb im Allgemeinen nicht kommutativ. Für zwei Quaternionen $p,q \in \mathbb{H}$ gilt also im Allgemeinen
+\[
+p \otimes q \neq q \otimes p.
+\]
+Das Symbol $\otimes$ bezeichnet hier das Hamilton Produkt.
+
+Clifford Algebren bzw. geometrische Algebren können als übergeordneter Rahmen verstanden werden, in dem verschiedene hyperkomplexe Zahlensysteme beschrieben werden können. Dazu gehören unter anderem komplexe Zahlen, Quaternionen und weitere höherdimensionale Algebren \cite{bill2023comparison}. Für dieses Projekt ist vor allem wichtig, dass Quaternionen als Spezialfall solcher algebraischen Strukturen betrachtet werden können. Dadurch lassen sich Lernregeln teilweise allgemeiner formulieren, sodass sie nicht nur für Quaternionen, sondern auch für andere hyperkomplexe Netzwerke gelten.
+
+Ein quaternionwertiges neuronales Netzwerk ist ein Netzwerk, in dem Eingaben, Gewichte, Bias Terme und Aktivierungen nicht reellwertig, sondern quaternionwertig sind. Ein Neuron verarbeitet also nicht nur eine einzelne reelle Zahl, sondern ein Quaternion mit vier Komponenten. Für eine Schicht $l$ kann die Vorwärtsrechnung eines quaternionwertigen Multilayer Perceptrons vereinfacht geschrieben werden als
+\[
+s_n^{(l)}
+=
+\sum_{m=1}^{N_{l 1}}
+w_{nm}^{(l)} \otimes x_m^{(l 1)}
++
+\theta_n^{(l)},
+\]
+\[
+x_n^{(l)} = \bar{\sigma}\left(s_n^{(l)}\right).
+\]
+Dabei bezeichnet:
+\begin{itemize}
+    \item $l$ die aktuelle Schicht,
+    \item $n$ das betrachtete Neuron in Schicht $l$,
+    \item $m$ ein Neuron aus der vorherigen Schicht,
+    \item $N_{l 1}$ die Anzahl Neuronen in der vorherigen Schicht,
+    \item $w_{nm}^{(l)} \in \mathbb{H}$ das quaternionwertige Gewicht zwischen den Neuronen $m$ und $n$,
+    \item $x_m^{(l 1)} \in \mathbb{H}$ die Aktivierung des Neurons $m$ aus der vorherigen Schicht,
+    \item $\theta_n^{(l)} \in \mathbb{H}$ den Bias Term,
+    \item $s_n^{(l)} \in \mathbb{H}$ die Voraktivierung,
+    \item $x_n^{(l)} \in \mathbb{H}$ die Ausgabe des Neurons,
+    \item $\bar{\sigma}$ eine quaternionwertige Aktivierungsfunktion.
+\end{itemize}
+
+Da viele klassische Aktivierungsfunktionen wie Sigmoid, Tanh oder ReLU ursprünglich für reelle Zahlen definiert sind, werden in quaternionwertigen Netzwerken häufig sogenannte Split Aktivierungsfunktionen verwendet \cite{bill2023comparison}. Dabei wird dieselbe reellwertige Aktivierungsfunktion komponentenweise auf das Quaternion angewendet:
+\[
+\bar{\sigma}(q)
+=
+\sigma(q_0)
++
+\sigma(q_1)\mathbf{i}
++
+\sigma(q_2)\mathbf{j}
++
+\sigma(q_3)\mathbf{k}.
+\]
+Hier ist $\sigma:\mathbb{R}\rightarrow\mathbb{R}$ eine gewöhnliche reellwertige Aktivierungsfunktion. Der Vorteil dieser Definition ist, dass sie einfach implementierbar ist. Der Nachteil ist, dass sie die vier Komponenten zwar gemeinsam in einem Quaternion speichert, die Nichtlinearität selbst aber komponentenweise angewendet wird.
+
+Ein wichtiger Ansatz aus der Clifford Algebra Literatur ist das Clifford Multilayer Perceptron (CMLP). Das CMLP formuliert die Vorwärtsrechnung und Backpropagation so, dass sie für verschiedene Clifford Algebren eingesetzt werden kann. Für Quaternionen ergibt sich daraus eine konkrete Lernregel für QMLPs. Bill, Cox und Champagne vergleichen mehrere quaternionwertige Backpropagation Verfahren und zeigen, dass CMLP in ihren Regressions Benchmarks eine starke Baseline darstellt \cite{bill2023comparison}. Für dieses Projekt ist CMLP deshalb relevant, weil es als etablierter Vergleichspunkt für ein quaternionwertiges Modell dient.
+
+\subsection{GHR Kalkül}
+
+Das Training quaternionwertiger neuronaler Netzwerke ist mathematisch anspruchsvoller als das Training reellwertiger Netzwerke. Der Hauptgrund ist die nicht kommutative Multiplikation der Quaternionen. Bei reellen Zahlen spielt die Reihenfolge einer Multiplikation keine Rolle. Bei Quaternionen ist dies anders. Dadurch werden Produkt - und Kettenregeln komplizierter, was direkte Ableitungen in der Quaternionenalgebra erschwert.
+
+Eine einfache Möglichkeit besteht darin, Ableitungen komponentenweise zu berechnen. Für ein Quaternion
+\[
+q = q_0 + q_1\mathbf{i} + q_2\mathbf{j} + q_3\mathbf{k}
+\]
+kann man eine sogenannte Pseudo Ableitung definieren als
+\[
+\nabla_q E
+=
+\frac{\partial E}{\partial q_0}
++
+\frac{\partial E}{\partial q_1}\mathbf{i}
++
+\frac{\partial E}{\partial q_2}\mathbf{j}
++
+\frac{\partial E}{\partial q_3}\mathbf{k}.
+\]
+Dabei ist $E$ eine reellwertige Fehler - oder Verlustfunktion. Diese Schreibweise behandelt ein Quaternion im Wesentlichen als vier reelle Parameter. Sie ist praktisch und wird in mehreren QVNN Ansätzen verwendet, ist aber nicht dasselbe wie ein vollständiger Quaternionenkalkül.
+
+Das Generalized Hamilton Real Kalkül, kurz GHR Kalkül, wurde entwickelt, um Ableitungen in der Quaternionenalgebra systematischer zu behandeln \cite{xu2015enabling}. Eine Grundidee besteht darin, Funktionen nach $q$ und nach dem konjugierten Quaternion $q^*$ abzuleiten. Das konjugierte Quaternion ist definiert als
+\[
+q^* = q_0  - q_1\mathbf{i}  - q_2\mathbf{j}  - q_3\mathbf{k}.
+\]
+Eine vereinfachte Form der GHR Ableitungen ist
+\[
+\frac{\partial f}{\partial q}
+=
+\frac{1}{4}
+\left(
+\frac{\partial f}{\partial q_0}
+ 
+\frac{\partial f}{\partial q_1}\mathbf{i}
+ 
+\frac{\partial f}{\partial q_2}\mathbf{j}
+ 
+\frac{\partial f}{\partial q_3}\mathbf{k}
+\right),
+\]
+\[
+\frac{\partial f}{\partial q^*}
+=
+\frac{1}{4}
+\left(
+\frac{\partial f}{\partial q_0}
++
+\frac{\partial f}{\partial q_1}\mathbf{i}
++
+\frac{\partial f}{\partial q_2}\mathbf{j}
++
+\frac{\partial f}{\partial q_3}\mathbf{k}
+\right).
+\]
+Dabei bezeichnet:
+\begin{itemize}
+    \item $f$ eine Funktion, die von einem Quaternion abhängt,
+    \item $q_0,q_1,q_2,q_3$ die vier reellen Komponenten von $q$,
+    \item $\frac{\partial f}{\partial q}$ die Ableitung nach dem Quaternion,
+    \item $\frac{\partial f}{\partial q^*}$ die Ableitung nach dem konjugierten Quaternion.
+\end{itemize}
+
+Für neuronale Netzwerke ist besonders der Fall relevant, in dem die Verlustfunktion reellwertig ist, also z.B. $E:\mathbb{H}^n \rightarrow \mathbb{R}$. Die Gewichte selbst liegen aber in $\mathbb{H}$. Beim Gradientenabstieg wird dann ein quaternionwertiger Gradient verwendet, um die quaternionwertigen Gewichte zu aktualisieren. Abstrakt kann ein Update für ein Gewicht $w \in \mathbb{H}$ als
+\[
+w \leftarrow w  - \eta \nabla_{w^*} E
+\]
+geschrieben werden. Dabei ist:
+\begin{itemize}
+    \item $w$ ein quaternionwertiges Gewicht,
+    \item $\eta > 0$ die Lernrate,
+    \item $E$ die Verlustfunktion,
+    \item $\nabla_{w^*}E$ der Gradient der Verlustfunktion bezüglich des konjugierten Gewichts.
+\end{itemize}
+
+Das GHR Kalkül ist theoretisch interessant, weil es eine formellere Behandlung quaternionwertiger Gradienten ermöglicht als rein komponentenweise Pseudo Gradienten. Gleichzeitig ist es in tiefen Netzwerken komplexer zu implementieren. Bill, Cox und Champagne vergleichen deshalb GHR mit anderen QVNN Lernregeln wie Arena, Nitta und CMLP \cite{bill2023comparison}. In ihrer Studie zeigt sich, dass Unterschiede in der mathematischen Formulierung der Lernregel messbare Auswirkungen auf die Modellleistung haben können. Für dieses Projekt ist GHR deshalb vor allem als mathematischer Referenzpunkt relevant: Es zeigt, warum Gradienten in $\mathbb{H}$ nicht trivial sind und warum alternative Lernarchitekturen wie Predictive Coding interessant sein können.
+
+\subsection{Predictive Coding Networks}
+
+Predictive Coding Networks (PCNs) basieren auf der Idee, dass ein Netzwerk nicht nur eine Eingabe durch mehrere Schichten nach vorne propagiert, sondern auf jeder Schicht versucht, die Aktivität der darunterliegenden Schicht vorherzusagen. Die Differenz zwischen Vorhersage und tatsächlicher Aktivität wird als Vorhersagefehler gespeichert. Das Netzwerk minimiert anschliessend die Summe dieser Vorhersagefehler \cite{stenlund2025pcn}.
+
+Wichtig ist dabei: Ein PCN ist nicht einfach ein alternativer Optimierer für ein gewöhnliches MLP. Stattdessen verändert sich die Modellstruktur selbst. In einem klassischen MLP werden Aktivierungen in einem Feedforward Pass berechnet. Bei einem PCN sind die latenten Zustände selbst Variablen, die während einer Inferenzphase iterativ angepasst werden. Erst danach werden die Gewichte gelernt. Dadurch entsteht eine Trennung zwischen Inferenz und Lernen.
+
+\subsubsection{Architektur}
+
+Ein PCN besteht aus einem Eingabevektor und mehreren latenten Schichten. Der Eingabevektor wird als
+\[
+x^{(0)} \in \mathbb{R}^{d_0}
+\]
+bezeichnet. Die latenten Zustände der höheren Schichten sind
+\[
+x^{(l)} \in \mathbb{R}^{d_l}, \qquad 1 \leq l \leq L.
+\]
+Dabei bezeichnet:
+\begin{itemize}
+    \item $l$ den Schichtindex,
+    \item $L$ die Anzahl latenter Schichten,
+    \item $d_l$ die Dimension der Schicht $l$,
+    \item $x^{(0)}$ die Eingabe,
+    \item $x^{(l)}$ den latenten Zustand der Schicht $l$.
+\end{itemize}
+
+Im PCN verläuft die generative Richtung von oben nach unten. Eine höhere Schicht versucht also, die darunterliegende Schicht vorherzusagen. Für jede Schicht $l$ mit $0 \leq l < L$ gilt
+\[
+a^{(l)} = W^{(l)}x^{(l+1)},
+\]
+\[
+\hat{x}^{(l)} = f^{(l)}(a^{(l)}),
+\]
+\[
+\varepsilon^{(l)} = x^{(l)}  - \hat{x}^{(l)}.
+\]
+Dabei bezeichnet:
+\begin{itemize}
+    \item $W^{(l)} \in \mathbb{R}^{d_l \times d_{l+1}}$ die Gewichtsmatrix von Schicht $l+1$ nach Schicht $l$,
+    \item $a^{(l)}$ die Voraktivierung der Schicht $l$,
+    \item $f^{(l)}$ die Aktivierungsfunktion der Schicht $l$,
+    \item $\hat{x}^{(l)}$ die Vorhersage der Aktivität $x^{(l)}$,
+    \item $\varepsilon^{(l)}$ den Vorhersagefehler der Schicht $l$.
+\end{itemize}
+
+Die Zielfunktion eines einfachen PCNs ist die Summe der quadratischen Vorhersagefehler:
+\[
+\mathcal{E}
+=
+\frac{1}{2}
+\sum_{l=0}^{L 1}
+\left\|
+\varepsilon^{(l)}
+\right\|^2.
+\]
+Hier bezeichnet $\mathcal{E}$ die Energie bzw. den Gesamtfehler des Netzwerks. Das Ziel des Netzwerks ist es, diese Energie zu minimieren. Im Gegensatz zu einem klassischen Feedforward Netz wird also nicht nur ein Output Fehler betrachtet, sondern eine Summe lokaler Fehler zwischen benachbarten Schichten.
+
+\subsubsection{Inferenz}
+
+Während der Inferenzphase bleiben die Gewichte $W^{(l)}$ fest. Stattdessen werden die latenten Zustände $x^{(1)},\dots,x^{(L)}$ iterativ angepasst, sodass die Energie $\mathcal{E}$ kleiner wird. Die Eingabe $x^{(0)}$ bleibt dabei fixiert, weil sie dem beobachteten Datenpunkt entspricht.
+
+Für eine latente Schicht $1 \leq l \leq L$ kann der Inferenzschritt als Gradientenabstieg auf den latenten Zustand geschrieben werden:
+\[
+x^{(l)}
+\leftarrow
+x^{(l)}
+ 
+\eta_{\text{infer}}
+\left[
+\varepsilon^{(l)}
+ 
+\left(W^{(l 1)}\right)^\top
+\left(
+f^{(l 1)\prime}(a^{(l 1)})
+\odot
+\varepsilon^{(l 1)}
+\right)
+\right].
+\]
+Dabei bezeichnet:
+\begin{itemize}
+    \item $\eta_{\text{infer}} > 0$ die Inferenzrate,
+    \item $f^{(l 1)\prime}$ die Ableitung der Aktivierungsfunktion der darunterliegenden Schicht,
+    \item $\odot$ das komponentenweise Produkt,
+    \item $\left(W^{(l 1)}\right)^\top$ die transponierte Gewichtsmatrix der Verbindung von Schicht $l$ nach Schicht $l 1$.
+\end{itemize}
+
+Der Ausdruck in eckigen Klammern beschreibt, wie der latente Zustand $x^{(l)}$ angepasst werden soll. Er besteht aus zwei Teilen. Der erste Teil, $\varepsilon^{(l)}$, misst, wie stark der Zustand $x^{(l)}$ selbst von der Vorhersage durch die darüberliegende Schicht abweicht. Der zweite Teil gibt an, wie stark $x^{(l)}$ zur Erklärung des Fehlers in der darunterliegenden Schicht beitragen kann. Dadurch wird jeder latente Zustand so angepasst, dass die lokalen Vorhersagefehler im Netzwerk kleiner werden.
+
+Für die oberste Schicht existiert keine darüberliegende Schicht, welche sie vorhersagt. In der Praxis kann man deshalb für die oberste Schicht vereinfachend $\varepsilon^{(L)}=0$ setzen. Dadurch kann dieselbe Update Formel auch für $l=L$ verwendet werden.
+
+\subsubsection{Learning}
+
+Nach der Inferenzphase werden die Gewichte angepasst. Dabei werden die inferierten latenten Zustände als gegeben betrachtet. Für jede Gewichtsmatrix $W^{(l)}$ ergibt sich ein lokaler Lernschritt:
+\[
+W^{(l)}
+\leftarrow
+W^{(l)}
++
+\eta_{\text{learn}}
+\left(
+f^{(l)\prime}(a^{(l)})
+\odot
+\varepsilon^{(l)}
+\right)
+\left(x^{(l+1)}\right)^\top.
+\]
+Dabei bezeichnet:
+\begin{itemize}
+    \item $\eta_{\text{learn}} > 0$ die Lernrate,
+    \item $\varepsilon^{(l)}$ den Vorhersagefehler der Schicht $l$,
+    \item $x^{(l+1)}$ die Aktivität der darüberliegenden Schicht,
+    \item $f^{(l)\prime}(a^{(l)})$ die lokale Ableitung der Aktivierungsfunktion.
+\end{itemize}
+
+Dieser Lernschritt ist lokal formuliert. Das bedeutet, dass das Update von $W^{(l)}$ nur Informationen aus zwei benachbarten Schichten benötigt: die Aktivität der oberen Schicht $x^{(l+1)}$ und den Fehler der unteren Schicht $\varepsilon^{(l)}$. Genau diese Lokalität ist einer der Gründe, warum PCNs in der Literatur als biologisch plausibler und potenziell interessant für parallele oder dezentrale Berechnungen diskutiert werden \cite{stenlund2025pcn}.
+
+Für überwachte Lernaufgaben kann ein zusätzlicher Ausgabeteil ergänzt werden. Beispielsweise kann die oberste latente Schicht $x^{(L)}$ durch eine lineare Abbildung auf eine Vorhersage $\hat{y}$ abgebildet werden:
+\[
+\hat{y} = W^{\text{out}}x^{(L)}.
+\]
+Für ein Ziel $y$ ergibt sich der überwachte Fehler
+\[
+\varepsilon^{\text{sup}} = \hat{y}  - y.
+\]
+Die Gesamtenergie kann dann um einen überwachten Term erweitert werden:
+\[
+\mathcal{E}_{\text{total}}
+=
+\mathcal{E}
++
+\frac{1}{2}
+\left\|
+\varepsilon^{\text{sup}}
+\right\|^2.
+\]
+Dadurch kann ein PCN nicht nur unüberwacht Rekonstruktionen lernen, sondern auch für überwachte Aufgaben wie Regression oder Klassifikation verwendet werden.
+
+Für dieses Projekt ist besonders relevant, dass PCNs eine andere Sicht auf Lernen ermöglichen. Während ein klassisches MLP seine Aktivierungen in einem Vorwärtsdurchlauf berechnet und anschliessend globale Gradienten über Backpropagation bestimmt, führt ein PCN zuerst eine Inferenz über interne Zustände durch und aktualisiert danach die Gewichte anhand lokaler Vorhersagefehler. Die Fragestellung dieses Projekts ist daher nicht nur, ob ein anderer Optimierer verwendet werden kann, sondern ob diese PCN Struktur mit quaternionwertigen Repräsentationen sinnvoll kombiniert werden kann.
