@@ -6,9 +6,11 @@ import argparse
 from dataclasses import dataclass, replace
 from datetime import datetime
 import json
+import math
 from pathlib import Path
 import shutil
 import time
+from typing import cast
 
 import matplotlib
 
@@ -21,6 +23,7 @@ from qvnn_pc.config import default_hyperparameters_path
 from qvnn_pc.data import BENCHMARK_FUNCTIONS, make_benchmark_regression_split
 from qvnn_pc.models import PredictiveCodingNetwork
 from qvnn_pc.models.pcn import ActivationName, LatentInitName
+from qvnn_pc.models.shared import OptimizerName
 from qvnn_pc.models.shared import pq_alpha_should_stop as _pq_alpha_should_stop
 
 DEFAULT_BENCHMARKS: tuple[str, ...] = tuple(BENCHMARK_FUNCTIONS)
@@ -35,20 +38,21 @@ class PredictiveCodingBenchmarkConfig:
     dims: tuple[int, ...] = (4, 20, 20, 20, 20)
     output_dim: int = 1
     activation: ActivationName = "tanh"
+    optimizer: OptimizerName = "SGD"
     epochs: int = 250
     repetitions: int = 1
     dataset_size: int = 30_000
     sample_seed: int = 0
     split_seed: int = 0
     batch_size: int = 512
-    eta_infer: float = 0.05
-    eta_learn: float = 0.005
-    T_infer_train: int = 50 
+    eta_infer: float = 0.01
+    eta_learn: float = 1e-4
+    T_infer_train: int = 24
     T_infer_eval: int = 32
-    T_learn: int = 500  
+    T_learn: int = 1
     latent_init: LatentInitName = "feedforward"
     probe_size: int = 128
-    early_stopping: bool = True
+    early_stopping: bool = False
     device: torch.device | str | None = "cuda" if torch.cuda.is_available() else "cpu"
     dtype: torch.dtype = torch.float32
 
@@ -108,6 +112,7 @@ def _save_run_metadata(
         "dims": list(config.dims),
         "output_dim": config.output_dim,
         "activation": config.activation,
+        "optimizer": config.optimizer,
         "epochs": config.epochs,
         "repetitions": config.repetitions,
         "dataset_size": config.dataset_size,
@@ -167,6 +172,10 @@ def _history_template() -> dict[str, list[float] | list[list[float]] | float | i
         "probe_val_supervised_mse_trace": [],
         "probe_val_latent_grad_trace": [],
     }
+
+
+def _metric_dict_is_finite(metrics: dict[str, float]) -> bool:
+    return all(math.isfinite(value) for value in metrics.values())
 
 
 def _record_probe_trace(
@@ -255,6 +264,7 @@ def _save_training_artifacts(
             "dims": list(config.dims),
             "output_dim": config.output_dim,
             "activation": config.activation,
+            "optimizer": config.optimizer,
             "eta_infer": config.eta_infer,
             "eta_learn": config.eta_learn,
             "T_infer_train": config.T_infer_train,
@@ -280,7 +290,7 @@ def _fit_model(
     y_val: torch.Tensor,
     config: PredictiveCodingBenchmarkConfig,
     shuffle_generator: torch.Generator,
-) -> dict[str, list[float] | list[list[float]] | float | int]:
+) -> dict[str, list[float] | list[list[float]] | float | int | str]:
     history = _history_template()
     best_state = {name: tensor.detach().cpu().clone() for name, tensor in model.state_dict().items()}
     best_validation_loss = float("inf")
@@ -290,70 +300,88 @@ def _fit_model(
     probe_val_y = y_val[:config.probe_size]
 
     start = time.perf_counter()
+    history["status"] = "completed"
     for _ in range(config.epochs):
         permutation = torch.randperm(x_train.shape[0], generator=shuffle_generator, device="cpu")
-        for batch_start in range(0, x_train.shape[0], config.batch_size):
-            batch_indices = permutation[batch_start:batch_start + config.batch_size]
-            model.train_batch(
-                x_train[batch_indices],
-                y_train[batch_indices],
+        try:
+            for batch_start in range(0, x_train.shape[0], config.batch_size):
+                batch_indices = permutation[batch_start:batch_start + config.batch_size]
+                model.train_batch(
+                    x_train[batch_indices],
+                    y_train[batch_indices],
+                    eta_infer=config.eta_infer,
+                    eta_learn=config.eta_learn,
+                    T_infer=config.T_infer_train,
+                    T_learn=config.T_learn,
+                    latent_init=config.latent_init,
+                )
+
+            train_metrics = model.evaluate(
+                x_train,
+                y_train,
+                infer_steps=config.T_infer_eval,
                 eta_infer=config.eta_infer,
-                eta_learn=config.eta_learn,
-                T_infer=config.T_infer_train,
-                T_learn=config.T_learn,
                 latent_init=config.latent_init,
             )
-
-        train_metrics = model.evaluate(
-            x_train,
-            y_train,
-            infer_steps=config.T_infer_eval,
-            eta_infer=config.eta_infer,
-            latent_init=config.latent_init,
-        )
-        val_metrics = model.evaluate(
-            x_val,
-            y_val,
-            infer_steps=config.T_infer_eval,
-            eta_infer=config.eta_infer,
-            latent_init=config.latent_init,
-        )
+            val_metrics = model.evaluate(
+                x_val,
+                y_val,
+                infer_steps=config.T_infer_eval,
+                eta_infer=config.eta_infer,
+                latent_init=config.latent_init,
+            )
+        except FloatingPointError:
+            history["status"] = "non_finite"
+            break
+        if not _metric_dict_is_finite(cast(dict[str, float], train_metrics)) or not _metric_dict_is_finite(
+            cast(dict[str, float], val_metrics)
+        ):
+            history["status"] = "non_finite"
+            break
 
         for key in ("mse", "mae", "mape", "r2", "free_energy", "reconstruction_mse", "supervised_mse"):
             history[f"train_{key}"].append(float(train_metrics[key]))  # type: ignore[index]
             history[f"validation_{key}"].append(float(val_metrics[key]))  # type: ignore[index]
 
-        probe_train_metrics = model.evaluate(
-            probe_train_x,
-            probe_train_y,
-            infer_steps=config.T_infer_eval,
-            eta_infer=config.eta_infer,
-            latent_init=config.latent_init,
-            return_trace=True,
+        probe_train_trace = cast(
+            dict[str, list[float]],
+            model.infer_latents(
+                probe_train_x,
+                y=probe_train_y,
+                steps=config.T_infer_eval,
+                eta_infer=config.eta_infer,
+                latent_init=config.latent_init,
+                return_trace=True,
+            )["trace"],
         )
-        probe_val_metrics = model.evaluate(
-            probe_val_x,
-            probe_val_y,
-            infer_steps=config.T_infer_eval,
-            eta_infer=config.eta_infer,
-            latent_init=config.latent_init,
-            return_trace=True,
+        probe_val_trace = cast(
+            dict[str, list[float]],
+            model.infer_latents(
+                probe_val_x,
+                y=probe_val_y,
+                steps=config.T_infer_eval,
+                eta_infer=config.eta_infer,
+                latent_init=config.latent_init,
+                return_trace=True,
+            )["trace"],
         )
-        _record_probe_trace(history, prefix="probe_train", metrics=probe_train_metrics)
-        _record_probe_trace(history, prefix="probe_val", metrics=probe_val_metrics)
+        _record_probe_trace(history, prefix="probe_train", metrics={"inference_trace": probe_train_trace})
+        _record_probe_trace(history, prefix="probe_val", metrics={"inference_trace": probe_val_trace})
 
         validation_loss = float(val_metrics["mae"])
+        best_validation_so_far = best_validation_loss
         if validation_loss < best_validation_loss:
             best_validation_loss = validation_loss
             best_state = {name: tensor.detach().cpu().clone() for name, tensor in model.state_dict().items()}
 
         if config.early_stopping and _pq_alpha_should_stop(
-            history["train_mae"],  # type: ignore[arg-type]
+            cast(list[float], history["train_mae"]),
             validation_loss,
-            best_validation_loss,
+            best_validation_so_far,
             window=5,
             threshold=0.5,
         ):
+            history["status"] = "early_stopped"
             break
 
     model.load_state_dict(best_state)
@@ -387,6 +415,7 @@ def run_pcn_benchmark(
                 list(config.dims),
                 output_dim=config.output_dim,
                 activation=config.activation,
+                optimizer=config.optimizer,
                 prediction_inference_steps=config.T_infer_eval,
                 prediction_eta_infer=config.eta_infer,
                 device=config.device,
@@ -448,6 +477,7 @@ def run_pcn_benchmark(
                     "algorithm": ALGORITHM_LABEL,
                     "test_function": benchmark,
                     "activation": config.activation,
+                    "optimizer": config.optimizer,
                     "layer_dims": "-".join(str(dim) for dim in config.dims),
                     "batch_size": config.batch_size,
                     "eta_infer": config.eta_infer,
@@ -463,6 +493,7 @@ def run_pcn_benchmark(
                     "test_free_energy": float(test_metrics["free_energy"]),
                     "test_reconstruction_mse": float(test_metrics["reconstruction_mse"]),
                     "test_supervised_mse": float(test_metrics["supervised_mse"]),
+                    "status": str(history["status"]),
                     "epochs": int(history["epochs_ran"]),
                     "runtime_seconds": float(history["runtime"]),
                 }

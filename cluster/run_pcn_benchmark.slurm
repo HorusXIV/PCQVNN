@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=pcqvnn-pcn
-#SBATCH --partition=p3080
+#SBATCH --partition=h200
 #SBATCH --array=0-3
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=8
@@ -15,7 +15,7 @@ set -euo pipefail
 PROJECT_ROOT="${PROJECT_ROOT:-$SLURM_SUBMIT_DIR}"
 CONTAINER_IMAGE="${CONTAINER_IMAGE:-$PROJECT_ROOT/cluster/pcqvnn.sif}"
 RESULTS_ROOT="${RESULTS_ROOT:-$PROJECT_ROOT/results}"
-RUN_NAME="${RUN_NAME:-pcn-rtx3080}"
+RUN_NAME="${RUN_NAME:-pcn-h200}"
 
 BENCHMARKS=(ackley griewank rastrigin schwefel)
 BENCHMARK="${BENCHMARKS[$SLURM_ARRAY_TASK_ID]}"

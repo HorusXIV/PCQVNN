@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-from contextlib import nullcontext
+import math
 import time
 from typing import Callable, Literal, cast
 
 import torch
 import torch.nn.functional as F
-from torch import autocast, nn
+from torch import nn
 
 import tqdm
+
+from .shared import OptimizerName
 
 ActivationName = Literal["leakyrelu", "sigmoid", "swish", "tanh"]
 LatentInitName = Literal["feedforward", "random", "zeros"]
@@ -55,10 +57,12 @@ def _activation_pair(name: ActivationName) -> tuple[
     )
 
 
-def _autocast_context(device: torch.device) -> nullcontext | autocast:
-    if device.type != "cuda":
-        return nullcontext()
-    return autocast(device_type="cuda", dtype=torch.float16)
+def _all_finite(tensors: list[torch.Tensor] | tuple[torch.Tensor, ...]) -> bool:
+    return all(torch.isfinite(tensor).all().item() for tensor in tensors)
+
+
+def _metrics_are_finite(metrics: dict[str, float]) -> bool:
+    return all(math.isfinite(value) for value in metrics.values())
 
 
 def scalar_regression_metrics(
@@ -120,8 +124,11 @@ class PredictiveCodingNetwork(nn.Module):
         output_dim: int = 1,
         *,
         activation: ActivationName = "tanh",
+        optimizer: OptimizerName = "SGD",
         prediction_inference_steps: int = 25,
         prediction_eta_infer: float = 0.05,
+        optimizer_eps: float = 1e-9,
+        adadelta_rho: float = 0.9,
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
@@ -137,8 +144,11 @@ class PredictiveCodingNetwork(nn.Module):
         self.output_dim = int(output_dim)
         self.L = len(self.dims) - 1
         self.activation_name = activation
+        self.optimizer_name = optimizer
         self.prediction_inference_steps = int(prediction_inference_steps)
         self.prediction_eta_infer = float(prediction_eta_infer)
+        self.optimizer_eps = float(optimizer_eps)
+        self.adadelta_rho = float(adadelta_rho)
         activation_fn, activation_deriv = _activation_pair(activation)
 
         self.layers = nn.ModuleList([
@@ -152,15 +162,20 @@ class PredictiveCodingNetwork(nn.Module):
             )
             for layer_idx in range(self.L)
         ])
-        self.readout = nn.Linear(self.dims[-1], self.output_dim, bias=False, device=device, dtype=dtype)
-        nn.init.xavier_uniform_(self.readout.weight)
+        self.readout_weight = nn.Parameter(torch.empty(self.output_dim, self.dims[-1], device=device, dtype=dtype))
+        nn.init.xavier_uniform_(self.readout_weight)
+        for layer_idx, layer in enumerate(self.layers):
+            self.register_buffer(f"_weight_acc_{layer_idx}", torch.zeros_like(layer.W))
+            self.register_buffer(f"_weight_delta_acc_{layer_idx}", torch.zeros_like(layer.W))
+        self.register_buffer("_readout_acc", torch.zeros_like(self.readout_weight))
+        self.register_buffer("_readout_delta_acc", torch.zeros_like(self.readout_weight))
 
     def _prepare_input(self, x: torch.Tensor) -> torch.Tensor:
         if x.ndim != 2:
             raise ValueError(f"Expected real-valued input shape (B, {self.dims[0]}), got {tuple(x.shape)}.")
         if x.shape[1] != self.dims[0]:
             raise ValueError(f"Expected input feature dimension {self.dims[0]}, got {x.shape[1]}.")
-        return x.to(device=self.readout.weight.device, dtype=self.readout.weight.dtype)
+        return x.to(device=self.readout_weight.device, dtype=self.readout_weight.dtype)
 
     def _prepare_target(self, y: torch.Tensor) -> torch.Tensor:
         if y.ndim == 1:
@@ -169,7 +184,45 @@ class PredictiveCodingNetwork(nn.Module):
             raise ValueError(f"Expected target shape (B, {self.output_dim}), got {tuple(y.shape)}.")
         if y.shape[1] != self.output_dim:
             raise ValueError(f"Expected target dimension {self.output_dim}, got {y.shape[1]}.")
-        return y.to(device=self.readout.weight.device, dtype=self.readout.weight.dtype)
+        return y.to(device=self.readout_weight.device, dtype=self.readout_weight.dtype)
+
+    def _readout(self, latent: torch.Tensor) -> torch.Tensor:
+        return F.linear(latent, self.readout_weight)
+
+    def _weight_accumulator(self, layer_idx: int) -> torch.Tensor:
+        return cast(torch.Tensor, getattr(self, f"_weight_acc_{layer_idx}"))
+
+    def _weight_delta_accumulator(self, layer_idx: int) -> torch.Tensor:
+        return cast(torch.Tensor, getattr(self, f"_weight_delta_acc_{layer_idx}"))
+
+    @torch.no_grad()
+    def _apply_update(
+        self,
+        *,
+        param: torch.Tensor,
+        gradient: torch.Tensor,
+        accumulator: torch.Tensor,
+        delta_accumulator: torch.Tensor,
+        lr: float,
+    ) -> None:
+        if self.optimizer_name == "SGD":
+            param.sub_(gradient, alpha=lr)
+            return
+        if self.optimizer_name == "Adagrad":
+            accumulator.addcmul_(gradient, gradient, value=1.0)
+            param.addcdiv_(gradient, accumulator.sqrt().add_(self.optimizer_eps), value=-lr)
+            return
+        if self.optimizer_name == "Adadelta":
+            accumulator.mul_(self.adadelta_rho).addcmul_(gradient, gradient, value=1.0 - self.adadelta_rho)
+            update = -gradient * torch.sqrt(delta_accumulator + self.optimizer_eps) / torch.sqrt(
+                accumulator + self.optimizer_eps
+            )
+            if lr != 1.0:
+                update.mul_(lr)
+            param.add_(update)
+            delta_accumulator.mul_(self.adadelta_rho).addcmul_(update, update, value=1.0 - self.adadelta_rho)
+            return
+        raise ValueError(f"Unsupported optimizer {self.optimizer_name!r} for PredictiveCodingNetwork.")
 
     def feedforward_latents(self, x: torch.Tensor) -> list[torch.Tensor]:
         current = self._prepare_input(x)
@@ -221,7 +274,7 @@ class PredictiveCodingNetwork(nn.Module):
         target: torch.Tensor | None = None,
     ) -> tuple[dict[str, float], torch.Tensor]:
         errors, _, _ = self.compute_errors(states)
-        y_hat = self.readout(states[-1])
+        y_hat = self._readout(states[-1])
         reconstruction_mse = torch.stack([error.square().mean() for error in errors]).mean()
         supervised_mse = torch.zeros((), device=y_hat.device, dtype=y_hat.dtype)
         if target is not None:
@@ -240,8 +293,8 @@ class PredictiveCodingNetwork(nn.Module):
         target: torch.Tensor | None = None,
     ) -> tuple[list[torch.Tensor], torch.Tensor]:
         errors, gain_modulated_errors, _ = self.compute_errors(states)
-        y_hat = self.readout(states[-1])
-        top_error = None if target is None else (y_hat - target) @ self.readout.weight
+        y_hat = self._readout(states[-1])
+        top_error = None if target is None else (y_hat - target) @ self.readout_weight
 
         gradients: list[torch.Tensor] = []
         for latent_idx in range(1, self.L + 1):
@@ -297,19 +350,24 @@ class PredictiveCodingNetwork(nn.Module):
             trace["supervised_mse"].append(energy_metrics["supervised_mse"])
             trace["mean_latent_grad_norm"].append(float(grad_norm.detach().cpu()))
 
-        with _autocast_context(x_real.device):
-            if infer_steps == 0:
-                gradients = [torch.zeros_like(latent) for latent in states[1:]]
-                prediction = self.readout(states[-1])
-                _record_trace(gradients)
-            else:
-                for _ in range(infer_steps):
-                    gradients, prediction = self._latent_gradients(states, target=y_real)
-                    _record_trace(gradients)
-                    for latent_idx, gradient in enumerate(gradients, start=1):
-                        states[latent_idx].sub_(gradient, alpha=infer_eta)
+        if infer_steps == 0:
+            gradients = [torch.zeros_like(latent) for latent in states[1:]]
+            prediction = self._readout(states[-1])
+            _record_trace(gradients)
+        else:
+            for _ in range(infer_steps):
                 gradients, prediction = self._latent_gradients(states, target=y_real)
+                if not _all_finite(tuple(gradients) + (prediction,)):
+                    raise FloatingPointError("PCN latent inference became non-finite.")
                 _record_trace(gradients)
+                for latent_idx, gradient in enumerate(gradients, start=1):
+                    states[latent_idx].sub_(gradient, alpha=infer_eta)
+                if not _all_finite(tuple(states[1:])):
+                    raise FloatingPointError("PCN latent states became non-finite during inference.")
+            gradients, prediction = self._latent_gradients(states, target=y_real)
+            if not _all_finite(tuple(gradients) + (prediction,)):
+                raise FloatingPointError("PCN final latent inference state became non-finite.")
+            _record_trace(gradients)
 
         return {
             "states": states,
@@ -320,7 +378,7 @@ class PredictiveCodingNetwork(nn.Module):
     @torch.no_grad()
     def fast_predict(self, x: torch.Tensor) -> torch.Tensor:
         latents = self.feedforward_latents(x)
-        return self.readout(latents[-1])
+        return self._readout(latents[-1])
 
     @torch.no_grad()
     def predict(
@@ -409,23 +467,41 @@ class PredictiveCodingNetwork(nn.Module):
         states = cast(list[torch.Tensor], inference_result["states"])
         batch_size = x_real.shape[0]
 
-        with _autocast_context(x_real.device):
-            for _ in range(T_learn):
-                _, gain_modulated_errors, _ = self.compute_errors(states)
-                for layer_idx, layer in enumerate(self.layers):
-                    gradient = -(gain_modulated_errors[layer_idx].T @ states[layer_idx + 1]) / batch_size
-                    layer.W.sub_(gradient, alpha=eta_learn)
+        for _ in range(T_learn):
+            _, gain_modulated_errors, _ = self.compute_errors(states)
+            for layer_idx, layer in enumerate(self.layers):
+                gradient = -(gain_modulated_errors[layer_idx].T @ states[layer_idx + 1]) / batch_size
+                self._apply_update(
+                    param=layer.W,
+                    gradient=gradient,
+                    accumulator=self._weight_accumulator(layer_idx),
+                    delta_accumulator=self._weight_delta_accumulator(layer_idx),
+                    lr=eta_learn,
+                )
 
-                output_error = self.readout(states[-1]) - y_real
-                readout_gradient = output_error.T @ states[-1] / batch_size
-                self.readout.weight.sub_(readout_gradient, alpha=eta_learn)
+            output_error = self._readout(states[-1]) - y_real
+            readout_gradient = output_error.T @ states[-1] / batch_size
+            self._apply_update(
+                param=self.readout_weight,
+                gradient=readout_gradient,
+                accumulator=cast(torch.Tensor, self._readout_acc),
+                delta_accumulator=cast(torch.Tensor, self._readout_delta_acc),
+                lr=eta_learn,
+            )
+            params = [layer.W for layer in self.layers] + [self.readout_weight]
+            if not _all_finite(tuple(params)):
+                raise FloatingPointError("PCN weights became non-finite during learning.")
 
-            energy_metrics, y_hat = self._compute_energy(states, target=y_real)
+        energy_metrics, y_hat = self._compute_energy(states, target=y_real)
+        if not _all_finite((y_hat,)):
+            raise FloatingPointError("PCN prediction became non-finite after learning.")
 
         metrics: dict[str, float | dict[str, list[float]]] = {
             **energy_metrics,
             **scalar_regression_metrics(y_hat, y_real),
         }
+        if not _metrics_are_finite(cast(dict[str, float], {k: v for k, v in metrics.items() if isinstance(v, float)})):
+            raise FloatingPointError("PCN batch metrics became non-finite.")
         if record_trace:
             metrics["inference_trace"] = cast(dict[str, list[float]], inference_result["trace"])
         return metrics
@@ -503,7 +579,7 @@ class PredictiveCodingNetwork(nn.Module):
         if (x_val is None) != (y_val is None):
             raise ValueError("Provide both x_val and y_val, or neither.")
 
-        history: dict[str, list[float] | float | int] = {
+        history: dict[str, list[float] | float | int | str] = {
             "mse": [],
             "mae": [],
             "mape": [],
@@ -515,42 +591,51 @@ class PredictiveCodingNetwork(nn.Module):
             "validation_mae": [],
             "validation_mape": [],
             "validation_r2": [],
+            "status": "completed",
         }
         eval_steps = self.prediction_inference_steps if eval_infer_steps is None else int(eval_infer_steps)
         start = time.perf_counter()
 
         for _ in tqdm.tqdm(range(epochs), desc="Training PCN", unit="epoch"):
             permutation = torch.randperm(x_train.shape[0], generator=shuffle_generator, device="cpu")
-            for batch_start in range(0, x_train.shape[0], batch_size):
-                batch_indices = permutation[batch_start:batch_start + batch_size]
-                self.train_batch(
-                    x_train[batch_indices],
-                    y_train[batch_indices],
-                    eta_infer=eta_infer,
-                    eta_learn=eta_learn,
-                    T_infer=T_infer,
-                    T_learn=T_learn,
-                    latent_init=latent_init,
-                )
+            try:
+                for batch_start in range(0, x_train.shape[0], batch_size):
+                    batch_indices = permutation[batch_start:batch_start + batch_size]
+                    self.train_batch(
+                        x_train[batch_indices],
+                        y_train[batch_indices],
+                        eta_infer=eta_infer,
+                        eta_learn=eta_learn,
+                        T_infer=T_infer,
+                        T_learn=T_learn,
+                        latent_init=latent_init,
+                    )
 
-            train_metrics = self.evaluate(
-                x_train,
-                y_train,
-                infer_steps=eval_steps,
-                eta_infer=eta_infer,
-                latent_init=latent_init,
-            )
-            for key in ("mse", "mae", "mape", "r2", "free_energy", "reconstruction_mse", "supervised_mse"):
-                history[key].append(float(train_metrics[key]))  # type: ignore[index]
-
-            if x_val is not None and y_val is not None:
-                val_metrics = self.evaluate(
-                    x_val,
-                    y_val,
+                train_metrics = self.evaluate(
+                    x_train,
+                    y_train,
                     infer_steps=eval_steps,
                     eta_infer=eta_infer,
                     latent_init=latent_init,
                 )
+            except FloatingPointError:
+                history["status"] = "non_finite"
+                break
+            for key in ("mse", "mae", "mape", "r2", "free_energy", "reconstruction_mse", "supervised_mse"):
+                history[key].append(float(train_metrics[key]))  # type: ignore[index]
+
+            if x_val is not None and y_val is not None:
+                try:
+                    val_metrics = self.evaluate(
+                        x_val,
+                        y_val,
+                        infer_steps=eval_steps,
+                        eta_infer=eta_infer,
+                        latent_init=latent_init,
+                    )
+                except FloatingPointError:
+                    history["status"] = "non_finite"
+                    break
                 for key in ("mse", "mae", "mape", "r2"):
                     history[f"validation_{key}"].append(float(val_metrics[key]))  # type: ignore[index]
 

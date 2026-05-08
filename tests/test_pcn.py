@@ -24,7 +24,7 @@ def test_pcn_fast_and_iterative_predictions_have_scalar_shape():
 
 
 def test_pcn_train_batch_returns_scalar_metrics():
-    model = PredictiveCodingNetwork([4, 5, 5], output_dim=1, prediction_inference_steps=1)
+    model = PredictiveCodingNetwork([4, 5, 5], output_dim=1, optimizer="Adagrad", prediction_inference_steps=1)
     x = torch.randn(8, 4)
     y = torch.randn(8, 1)
 
