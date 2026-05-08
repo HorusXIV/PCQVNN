@@ -1,8 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=pcqvnn-archcmp
-#SBATCH --partition=h200
+#SBATCH --cluster=calc-cpu
+#SBATCH --partition=cpu-daily
 #SBATCH --array=0-3%4
-#SBATCH --cpus-per-task=100
+#SBATCH --cpus-per-task=256
 #SBATCH --mem=32G
 #SBATCH --time=24:00:00
 #SBATCH --signal=B:SIGUSR1@60
