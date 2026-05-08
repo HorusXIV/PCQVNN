@@ -42,10 +42,10 @@ class PredictiveCodingBenchmarkConfig:
     split_seed: int = 0
     batch_size: int = 512
     eta_infer: float = 0.05
-    eta_learn: float = 0.001
-    T_infer_train: int = 24
+    eta_learn: float = 0.005
+    T_infer_train: int = 50 
     T_infer_eval: int = 32
-    T_learn: int = 1
+    T_learn: int = 500  
     latent_init: LatentInitName = "feedforward"
     probe_size: int = 128
     early_stopping: bool = True
