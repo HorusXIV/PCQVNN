@@ -1,2 +1,2 @@
-repetition,algorithm,test_function,activation,layer_dims,batch_size,eta_infer,eta_learn,T_infer_train,T_infer_eval,T_learn,latent_init,test_mse,test_mae,test_mape,test_r2,test_free_energy,test_reconstruction_mse,test_supervised_mse,epochs,runtime_seconds
-1,PCN,griewank,tanh,4-20-20-20-20,512,0.05,0.005,50,32,500,feedforward,17643.923828125,121.37190246582031,1.0000237226486206,-5.058286666870117,8821.9833984375,0.0440799854695797,17643.921875,250,1645.1460813810118
+repetition,algorithm,test_function,activation,optimizer,layer_dims,batch_size,eta_infer,eta_learn,T_infer_train,T_infer_eval,T_learn,latent_init,test_mse,test_mae,test_mape,test_r2,test_free_energy,test_reconstruction_mse,test_supervised_mse,status,epochs,runtime_seconds
+1,PCN,griewank,tanh,SGD,4-20-20-20-20,512,0.01,0.0001,24,32,1,feedforward,17640.404296875,121.33655548095703,0.999705970287323,-5.057077884674072,8820.2314453125,0.058423832058906555,17640.404296875,completed,250,163.45842817099765

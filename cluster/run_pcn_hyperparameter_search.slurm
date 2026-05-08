@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=pcqvnn-pcn-search
 #SBATCH --partition=h200
-#SBATCH --array=0-3
+#SBATCH --array=0-3%2
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
 #SBATCH --mem=32G
-#SBATCH --time=04:30:00
+#SBATCH --time=12:30:00
 #SBATCH --open-mode=append
 #SBATCH --output=logs/%x-%A_%a.out
 
