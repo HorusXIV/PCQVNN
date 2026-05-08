@@ -26,6 +26,6 @@
   "probe_size": 128,
   "early_stopping": true,
   "summary_path": "/workspace/results/pcn_h200/rastrigin/pcn_benchmark.csv",
-  "device": "cpu",
+  "device": "cuda",
   "dtype": "torch.float32"
 }

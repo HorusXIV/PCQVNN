@@ -56039,7 +56039,7 @@
       NaN
     ]
   ],
-  "runtime": 499.34919174807146,
+  "runtime": 90.39298711088486,
   "best_validation_loss": Infinity,
   "epochs_ran": 250
 }
