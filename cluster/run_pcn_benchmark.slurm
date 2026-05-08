@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=pcqvnn-pcn
-#SBATCH -M cluster
-#SBATCH --partition=h200
+#SBATCH --partition=p3080
 #SBATCH --array=0-3
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=8
+#SBATCH --gres=gpu:1
 #SBATCH --mem=24G
 #SBATCH --time=03:00:00
 #SBATCH --open-mode=append
