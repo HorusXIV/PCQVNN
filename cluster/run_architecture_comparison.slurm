@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --job-name=pcqvnn-archcmp
-#SBATCH -M cluster
-#SBATCH --partition=performance
-#SBATCH --cpus-per-task=256
-#SBATCH --mem=64G
+#SBATCH --partition=h200
+#SBATCH --array=0-3%4
+#SBATCH --cpus-per-task=100
+#SBATCH --mem=32G
 #SBATCH --time=24:00:00
 #SBATCH --signal=B:SIGUSR1@60
 #SBATCH --open-mode=append
-#SBATCH --output=logs/%x-%j.out
+#SBATCH --output=logs/%x-%A_%a.out
 
 set -euo pipefail
 
@@ -43,7 +43,9 @@ to_container_path() {
 
 RESULTS_ROOT_IN_CONTAINER="$(to_container_path "$RESULTS_ROOT")"
 RUN_NAME="${RUN_NAME:-archcmp_resume}"
-OUTPUT_PATH_IN_CONTAINER="$RESULTS_ROOT_IN_CONTAINER/$RUN_NAME/architecture_comparison.csv"
+BENCHMARKS=(ackley griewank rastrigin schwefel)
+BENCHMARK="${BENCHMARKS[$SLURM_ARRAY_TASK_ID]}"
+OUTPUT_PATH_IN_CONTAINER="$RESULTS_ROOT_IN_CONTAINER/$RUN_NAME/architecture_comparison_${BENCHMARK}.csv"
 
 REQUEUE_REQUESTED=0
 CHILD_PID=""
@@ -64,6 +66,7 @@ cleanup_and_requeue() {
 trap 'cleanup_and_requeue' USR1
 
 echo "Job started at $(date) (restart count: ${SLURM_RESTART_COUNT:-0})"
+echo "Benchmark: $BENCHMARK"
 echo "Run output will be written to $OUTPUT_PATH_IN_CONTAINER"
 
 timeout --signal=SIGUSR1 1430m \
@@ -71,6 +74,7 @@ timeout --signal=SIGUSR1 1430m \
     --bind "$PROJECT_ROOT:/workspace" \
     "$CONTAINER_IMAGE" \
     python -m qvnn_pc.architecture_comparison \
+    --benchmark "$BENCHMARK" \
     --output "$OUTPUT_PATH_IN_CONTAINER" \
     "$@" &
 CHILD_PID=$!

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 import json
 from pathlib import Path
@@ -189,8 +189,10 @@ def _save_training_artifacts(
     batch_size: int,
 ) -> None:
     stem = f"{benchmark}_{architecture}_rep{repetition:02d}"
-    history_path = run_dir / "history" / f"{stem}.json"
-    model_path = run_dir / "models" / f"{stem}.pt"
+    history_relpath = Path("history") / f"{stem}.json"
+    model_relpath = Path("models") / f"{stem}.pt"
+    history_path = run_dir / history_relpath
+    model_path = run_dir / model_relpath
 
     with history_path.open("w", encoding="utf-8") as handle:
         json.dump(history, handle, indent=2)
@@ -207,6 +209,8 @@ def _save_training_artifacts(
             "learning_rate": learning_rate,
             "batch_size": batch_size,
             "history_path": str(history_path),
+            "history_relpath": history_relpath.as_posix(),
+            "model_relpath": model_relpath.as_posix(),
             "checkpoint_note": "Model parameters restored to the best tracked validation checkpoint.",
         },
         model_path,
@@ -215,6 +219,192 @@ def _save_training_artifacts(
 
 def _checkpoint_path(run_dir: Path, benchmark: str, architecture: ArchitectureName, repetition: int) -> Path:
     return run_dir / "checkpoints" / f"{benchmark}_{architecture}_rep{repetition:02d}.pt"
+
+
+def _history_path(run_dir: Path, benchmark: str, architecture: ArchitectureName, repetition: int) -> Path:
+    return run_dir / "history" / f"{benchmark}_{architecture}_rep{repetition:02d}.json"
+
+
+def _sort_results(results: pd.DataFrame) -> pd.DataFrame:
+    if results.empty:
+        return results
+    return results.sort_values(["test_function", "algorithm", "repetition"]).reset_index(drop=True)
+
+
+def _resolve_artifact_history_path(
+    run_dir: Path,
+    artifact: dict,
+    *,
+    benchmark: str,
+    architecture: ArchitectureName,
+    repetition: int,
+) -> Path | None:
+    history_relpath = artifact.get("history_relpath")
+    if isinstance(history_relpath, str):
+        candidate = run_dir / history_relpath
+        if candidate.exists():
+            return candidate
+
+    canonical_path = _history_path(run_dir, benchmark, architecture, repetition)
+    if canonical_path.exists():
+        return canonical_path
+
+    history_path_value = artifact.get("history_path")
+    if isinstance(history_path_value, str):
+        candidate = Path(history_path_value)
+        if candidate.exists():
+            return candidate
+
+    return None
+
+
+def _load_model_from_artifact(
+    artifact: dict,
+    *,
+    repetition: int,
+    device: torch.device | str | None,
+    dtype: torch.dtype,
+):
+    architecture = _canonical_architecture_name(str(artifact["architecture"]))
+    model = _build_model(
+        architecture,
+        activation=str(artifact["activation"]),
+        optimizer=str(artifact["optimizer"]),
+        lr=float(artifact["learning_rate"]),
+        layer_sizes=tuple(int(size) for size in artifact["layer_sizes"]),
+        init_seed=int(repetition * 1e3),
+        device=device,
+        dtype=dtype,
+    )
+    model.load_state_dict(artifact["state_dict"])
+    return architecture, model
+
+
+def _reconstruct_results_from_artifacts(
+    run_dir: Path,
+    config: ArchitectureComparisonConfig,
+) -> pd.DataFrame | None:
+    models_dir = run_dir / "models"
+    if not models_dir.exists():
+        return None
+
+    dataset_cache: dict[str, object] = {}
+    benchmark_to_index = {name: idx for idx, name in enumerate(config.benchmarks)}
+    rows: list[dict[str, float | int | str]] = []
+
+    for model_path in sorted(models_dir.glob("*.pt")):
+        artifact = torch.load(model_path, map_location="cpu")
+        benchmark = _canonical_benchmark_name(str(artifact["benchmark"]))
+        if benchmark not in benchmark_to_index:
+            continue
+
+        repetition = int(artifact["repetition"])
+        architecture, model = _load_model_from_artifact(
+            artifact,
+            repetition=repetition,
+            device=config.device,
+            dtype=config.dtype,
+        )
+
+        split = dataset_cache.get(benchmark)
+        if split is None:
+            benchmark_idx = benchmark_to_index[benchmark]
+            split = make_benchmark_regression_split(
+                benchmark,
+                n=config.dataset_size,
+                sample_seed=config.sample_seed + benchmark_idx,
+                split_seed=config.split_seed + benchmark_idx,
+                device=config.device,
+                dtype=config.dtype,
+            )
+            dataset_cache[benchmark] = split
+
+        test_pred = model.forward(split.x_test)
+        test_metrics = scalar_regression_metrics(test_pred, split.y_test)
+        test_qmae = float(quaternion_mae_loss(test_pred, split.y_test).detach().cpu())
+
+        history_path = _resolve_artifact_history_path(
+            run_dir,
+            artifact,
+            benchmark=benchmark,
+            architecture=architecture,
+            repetition=repetition,
+        )
+        history: dict[str, float | int | list[float]] = {}
+        if history_path is not None:
+            with history_path.open("r", encoding="utf-8") as handle:
+                history = json.load(handle)
+
+        rows.append(
+            {
+                "repetition": repetition,
+                "algorithm": ARCHITECTURE_LABELS[architecture],
+                "test_function": benchmark,
+                "learning_rate": float(artifact["learning_rate"]),
+                "optimizer": str(artifact["optimizer"]),
+                "activation": str(artifact["activation"]),
+                "batch_size": int(artifact["batch_size"]),
+                "test_quaternion_mae": test_qmae,
+                "test_mse": test_metrics["mse"],
+                "test_mae": test_metrics["mae"],
+                "test_mape": test_metrics["mape"],
+                "test_r2": test_metrics["r2"],
+                "epochs": int(history.get("epochs_ran", len(history.get("quaternion_mae", [])))),
+                "runtime_seconds": float(history.get("runtime", float("nan"))),
+            }
+        )
+
+    if not rows:
+        return None
+    return _sort_results(pd.DataFrame(rows))
+
+
+def _load_existing_results(
+    summary_path: Path,
+    run_dir: Path,
+    config: ArchitectureComparisonConfig,
+) -> pd.DataFrame | None:
+    if summary_path.exists():
+        try:
+            return pd.read_csv(summary_path)
+        except EmptyDataError:
+            pass
+
+    reconstructed = _reconstruct_results_from_artifacts(run_dir, config)
+    if reconstructed is None or reconstructed.empty:
+        return None
+
+    write_architecture_comparison(reconstructed, summary_path)
+    return reconstructed
+
+
+def _update_combined_summary(fragment_path: Path) -> None:
+    if fragment_path.suffix.lower() != ".csv":
+        return
+    if not fragment_path.stem.startswith("architecture_comparison_"):
+        return
+
+    fragment_paths = sorted(fragment_path.parent.glob("architecture_comparison_*.csv"))
+    if not fragment_paths:
+        return
+
+    frames = []
+    for path in fragment_paths:
+        try:
+            frame = pd.read_csv(path)
+        except EmptyDataError:
+            continue
+        if frame.empty:
+            continue
+        frames.append(frame)
+
+    if not frames:
+        return
+
+    merged = pd.concat(frames, ignore_index=True)
+    merged = merged.drop_duplicates(subset=["test_function", "algorithm", "repetition"], keep="last")
+    merged = _sort_results(merged)
+    merged.to_csv(fragment_path.parent / "architecture_comparison.csv", index=False)
 
 
 def _clone_state_dict(model) -> dict[str, torch.Tensor]:
@@ -395,6 +585,7 @@ def run_architecture_comparison(
     *,
     run_dir: Path | None = None,
     existing_results: pd.DataFrame | None = None,
+    progress_output_path: Path | None = None,
 ) -> pd.DataFrame:
     global _STOP_REQUESTED
     rows: list[dict[str, float | int | str]] = []
@@ -408,6 +599,8 @@ def run_architecture_comparison(
         }
 
     if run_dir is not None:
+        (run_dir / "models").mkdir(parents=True, exist_ok=True)
+        (run_dir / "history").mkdir(parents=True, exist_ok=True)
         (run_dir / "checkpoints").mkdir(exist_ok=True)
 
     for benchmark_idx, benchmark_name in enumerate(config.benchmarks):
@@ -505,20 +698,24 @@ def run_architecture_comparison(
                     }
                 )
                 completed.add(result_key)
+                if progress_output_path is not None:
+                    write_architecture_comparison(pd.DataFrame(rows), progress_output_path)
 
     results = pd.DataFrame(rows)
     if results.empty:
         return results
-    return results.sort_values(["test_function", "algorithm", "repetition"]).reset_index(drop=True)
+    return _sort_results(results)
 
 
 def write_architecture_comparison(results: pd.DataFrame, output_path: str | Path) -> Path:
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
+    ordered = _sort_results(results)
     if output.suffix.lower() == ".xlsx":
-        results.to_excel(output, index=False)
+        ordered.to_excel(output, index=False)
     else:
-        results.to_csv(output, index=False)
+        ordered.to_csv(output, index=False)
+        _update_combined_summary(output)
     return output
 
 
@@ -530,19 +727,24 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description="Run the saved architecture comparison with in-file settings.")
     parser.add_argument("--output", type=Path, default=None)
+    parser.add_argument("--benchmark", action="append", default=None, help="Restrict the run to one benchmark. Repeat for multiple benchmarks.")
     args = parser.parse_args(argv)
 
     config = SCRIPT_CONFIG
+    if args.benchmark:
+        config = replace(
+            config,
+            benchmarks=tuple(_canonical_benchmark_name(name) for name in args.benchmark),
+        )
     run_dir, summary_path = _prepare_run_directory(args.output)
     _save_run_metadata(run_dir, config, summary_path=summary_path)
-    if summary_path.exists():
-        try:
-            existing_results = pd.read_csv(summary_path)
-        except EmptyDataError:
-            existing_results = None
-    else:
-        existing_results = None
-    results = run_architecture_comparison(config, run_dir=run_dir, existing_results=existing_results)
+    existing_results = _load_existing_results(summary_path, run_dir, config)
+    results = run_architecture_comparison(
+        config,
+        run_dir=run_dir,
+        existing_results=existing_results,
+        progress_output_path=summary_path,
+    )
     path = write_architecture_comparison(results, summary_path)
     print(f"Wrote {len(results)} rows to {path}.")
     print(f"Saved run artifacts to {run_dir}.")
