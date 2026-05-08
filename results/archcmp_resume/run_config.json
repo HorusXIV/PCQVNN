@@ -1,0 +1,28 @@
+{
+  "benchmarks": [
+    "ackley",
+    "griewank",
+    "rastrigin",
+    "schwefel"
+  ],
+  "architectures": [
+    "cmlp",
+    "ghr"
+  ],
+  "layer_sizes": [
+    1,
+    5,
+    5,
+    5,
+    1
+  ],
+  "epochs": 100,
+  "repetitions": 5,
+  "dataset_size": 30000,
+  "sample_seed": 0,
+  "split_seed": 0,
+  "early_stopping": true,
+  "summary_path": "/workspace/results/archcmp_resume/architecture_comparison.csv",
+  "device": "cpu",
+  "dtype": "torch.float32"
+}
