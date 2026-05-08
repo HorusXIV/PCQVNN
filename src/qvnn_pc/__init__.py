@@ -25,6 +25,7 @@ from .config import (
 from .functions import ackley_4d, griewank_4d, rastrigin_4d, schwefel_4d
 from .models import (
     CMLPQuaternionMLP,
+    ClassicalMLP,
     GHRQuaternionMLP,
     OptimizerName,
     quaternion_adagrad_step_,
@@ -53,6 +54,7 @@ __all__ = [
     "BENCHMARK_FUNCTIONS",
     "ArchitectureComparisonConfig",
     "CMLPQuaternionMLP",
+    "ClassicalMLP",
     "GHRQuaternionMLP",
     "ModelHyperparameters",
     "OptimizerName",

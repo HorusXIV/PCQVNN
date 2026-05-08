@@ -2,7 +2,7 @@
 #SBATCH --job-name=pcqvnn-archcmp
 #SBATCH -M cluster
 #SBATCH --partition=performance
-#SBATCH --cpus-per-task=64
+#SBATCH --cpus-per-task=256
 #SBATCH --mem=64G
 #SBATCH --time=24:00:00
 #SBATCH --signal=B:SIGUSR1@60

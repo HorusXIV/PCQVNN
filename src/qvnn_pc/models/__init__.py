@@ -9,6 +9,7 @@ from .shared import (
     scalar_regression_metrics,
 )
 from .cmlp import CMLPQuaternionMLP
+from .classical_mlp import ClassicalMLP
 from .ghr import (
     GHRQuaternionMLP,
 )
@@ -20,6 +21,7 @@ from .pcn import (
 
 __all__ = [
     "CMLPQuaternionMLP",
+    "ClassicalMLP",
     "GHRQuaternionMLP",
     "OptimizerName",
     "quaternion_adagrad_step_",
