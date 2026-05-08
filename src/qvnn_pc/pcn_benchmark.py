@@ -64,6 +64,21 @@ def _canonical_benchmark_name(name: str) -> str:
     return key
 
 
+def _validate_requested_device(device: torch.device | str | None) -> None:
+    if device is None:
+        return
+    resolved = torch.device(device)
+    if resolved.type != "cuda":
+        return
+    if torch.cuda.is_available():
+        return
+    raise RuntimeError(
+        "CUDA was explicitly requested for the PCN benchmark, but PyTorch could not initialize CUDA. "
+        "This usually means the container's PyTorch/CUDA build is incompatible with the cluster driver. "
+        "Rebuild the container with a compatible pinned torch wheel and rerun the job."
+    )
+
+
 def _timestamped_run_name() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -470,11 +485,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run real-valued predictive coding regression benchmarks.")
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--benchmark", type=str, default=None)
+    parser.add_argument("--device", type=str, default=None)
     args = parser.parse_args(argv)
 
     config = SCRIPT_CONFIG
     if args.benchmark is not None:
         config = replace(config, benchmarks=(_canonical_benchmark_name(args.benchmark),))
+    if args.device is not None:
+        config = replace(config, device=args.device)
+
+    _validate_requested_device(config.device)
 
     run_dir, summary_path = _prepare_run_directory(args.output)
     _save_run_metadata(run_dir, config, summary_path=summary_path)

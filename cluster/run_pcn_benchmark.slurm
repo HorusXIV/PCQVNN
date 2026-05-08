@@ -59,5 +59,6 @@ echo "Run output: $OUTPUT_PATH_IN_CONTAINER"
     "$CONTAINER_IMAGE" \
     python -m qvnn_pc.pcn_benchmark \
     --benchmark "$BENCHMARK" \
+    --device cuda \
     --output "$OUTPUT_PATH_IN_CONTAINER" \
     "$@"
