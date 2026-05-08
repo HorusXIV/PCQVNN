@@ -15,7 +15,7 @@ From: python:3.12-slim
     # newest default wheel on PyPI happens to be at image-build time.
     python -m pip install --no-cache-dir \
         --index-url https://download.pytorch.org/whl/cu124 \
-        torch==2.2.0
+        torch==2.5.1
     python -m pip install --no-cache-dir \
         numpy \
         scipy \
