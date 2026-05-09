@@ -1,0 +1,53 @@
+{
+  "benchmarks": [
+    "rastrigin"
+  ],
+  "dims": [
+    4,
+    20,
+    20,
+    20,
+    20
+  ],
+  "output_dim": 1,
+  "epochs": 30,
+  "trials": 24,
+  "dataset_size": 30000,
+  "sample_seed": 0,
+  "split_seed": 0,
+  "search_seed": 17,
+  "batch_size": 512,
+  "latent_init": "feedforward",
+  "probe_size": 128,
+  "device": "cuda",
+  "dtype": "torch.float32",
+  "eta_log10_range": [
+    -7.0,
+    -2.0
+  ],
+  "T_infer_train_range": [
+    4,
+    64
+  ],
+  "T_infer_eval_range": [
+    4,
+    64
+  ],
+  "T_learn_range": [
+    1,
+    12
+  ],
+  "activations": [
+    "tanh",
+    "sigmoid",
+    "swish",
+    "leakyrelu"
+  ],
+  "optimizers": [
+    "SGD",
+    "Adagrad",
+    "Adadelta"
+  ],
+  "sampler": "scipy.stats.qmc.LatinHypercube(optimization='random-cd')",
+  "summary_path": "/workspace/results/pcn-h200-search/rastrigin/pcn_hyperparameter_search.csv"
+}
