@@ -1,0 +1,22 @@
+{
+  "benchmark": "rastrigin",
+  "trial": 8,
+  "activation": "sigmoid",
+  "optimizer": "SGD",
+  "eta_infer": 8.451015347228319e-07,
+  "eta_learn": 5.203262953822821e-06,
+  "T_infer_train": 45,
+  "T_infer_eval": 12,
+  "T_learn": 11,
+  "status": "completed",
+  "epochs": 30,
+  "runtime_seconds": 36.08873086608946,
+  "train_mae": 54.29159927368164,
+  "val_mae": 54.16632843017578,
+  "test_mae": 54.360755920410156,
+  "train_mse": 3366.461669921875,
+  "val_mse": 3346.105712890625,
+  "test_mse": 3349.894287109375,
+  "val_r2": -7.096001625061035,
+  "test_r2": -7.4521942138671875
+}

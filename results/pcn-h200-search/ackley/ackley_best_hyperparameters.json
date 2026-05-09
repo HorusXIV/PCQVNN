@@ -1,0 +1,22 @@
+{
+  "benchmark": "ackley",
+  "trial": 24,
+  "activation": "sigmoid",
+  "optimizer": "SGD",
+  "eta_infer": 0.004974335697678573,
+  "eta_learn": 0.0029944819423682258,
+  "T_infer_train": 41,
+  "T_infer_eval": 44,
+  "T_learn": 2,
+  "status": "completed",
+  "epochs": 30,
+  "runtime_seconds": 31.390945004066452,
+  "train_mae": 13.041646957397461,
+  "val_mae": 13.031798362731934,
+  "test_mae": 13.028069496154785,
+  "train_mse": 171.36944580078125,
+  "val_mse": 171.22802734375,
+  "test_mse": 171.04966735839844,
+  "val_r2": -121.31126403808594,
+  "test_r2": -128.68801879882812
+}
