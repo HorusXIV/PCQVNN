@@ -1,4 +1,4 @@
-"""Latin-hypercube hyperparameter search for the real-valued predictive coding network."""
+"""Batch-stratified Latin-hypercube search for the real-valued predictive coding network."""
 
 from __future__ import annotations
 
@@ -37,13 +37,13 @@ class PredictiveCodingSearchConfig:
     benchmarks: tuple[str, ...] = tuple(BENCHMARK_FUNCTIONS)
     dims: tuple[int, ...] = (4, 20, 20, 20, 20)
     output_dim: int = 1
-    epochs: int = 30
-    trials: int = 24
+    epochs: int = 80
+    trials: int = 48
     dataset_size: int = 30_000
     sample_seed: int = 0
     split_seed: int = 0
     search_seed: int = 17
-    batch_size: int = 512
+    batch_sizes: tuple[int, ...] = (1, 8, 32, 128, 512)
     latent_init: LatentInitName = "feedforward"
     probe_size: int = 128
     device: torch.device | str | None = "cuda" if torch.cuda.is_available() else "cpu"
@@ -92,7 +92,7 @@ def _save_run_metadata(run_dir: Path, config: PredictiveCodingSearchConfig, *, s
         "sample_seed": config.sample_seed,
         "split_seed": config.split_seed,
         "search_seed": config.search_seed,
-        "batch_size": config.batch_size,
+        "batch_sizes": list(config.batch_sizes),
         "latent_init": config.latent_init,
         "probe_size": config.probe_size,
         "device": None if config.device is None else str(config.device),
@@ -103,7 +103,7 @@ def _save_run_metadata(run_dir: Path, config: PredictiveCodingSearchConfig, *, s
         "T_learn_range": [config.T_learn_min, config.T_learn_max],
         "activations": list(config.activations),
         "optimizers": list(config.optimizers),
-        "sampler": "scipy.stats.qmc.LatinHypercube(optimization='random-cd')",
+        "sampler": "batch-stratified scipy.stats.qmc.LatinHypercube(optimization='random-cd')",
         "summary_path": str(summary_path),
     }
     with (run_dir / "run_config.json").open("w", encoding="utf-8") as handle:
@@ -116,32 +116,59 @@ def _scaled_int(sample_value: float, lower: int, upper: int) -> int:
     return lower + idx
 
 
+def _validate_batch_sizes(batch_sizes: tuple[int, ...]) -> tuple[int, ...]:
+    normalized = tuple(dict.fromkeys(int(batch_size) for batch_size in batch_sizes))
+    if not normalized:
+        raise ValueError("Expected at least one candidate batch size.")
+    if any(batch_size <= 0 for batch_size in normalized):
+        raise ValueError(f"Expected all batch sizes > 0, got {normalized}.")
+    return normalized
+
+
 def _sample_trial_grid(
     config: PredictiveCodingSearchConfig,
     *,
     benchmark_idx: int,
 ) -> list[dict[str, float | int | str]]:
-    sampler = qmc.LatinHypercube(d=7, optimization="random-cd", seed=config.search_seed + benchmark_idx)
-    unit = sampler.random(config.trials)
+    batch_sizes = _validate_batch_sizes(config.batch_sizes)
+    if config.trials <= 0:
+        raise ValueError(f"Expected trials > 0, got {config.trials}.")
 
+    base_trials = config.trials // len(batch_sizes)
+    remainder = config.trials % len(batch_sizes)
     trials: list[dict[str, float | int | str]] = []
-    for trial_idx, row in enumerate(unit, start=1):
-        eta_infer = 10.0 ** (config.eta_log10_min + row[0] * (config.eta_log10_max - config.eta_log10_min))
-        eta_learn = 10.0 ** (config.eta_log10_min + row[1] * (config.eta_log10_max - config.eta_log10_min))
-        optimizer = config.optimizers[min(int(row[5] * len(config.optimizers)), len(config.optimizers) - 1)]
-        activation = config.activations[min(int(row[6] * len(config.activations)), len(config.activations) - 1)]
-        trials.append(
-            {
-                "trial": trial_idx,
-                "eta_infer": float(eta_infer),
-                "eta_learn": float(eta_learn),
-                "T_infer_train": _scaled_int(float(row[2]), config.T_infer_train_min, config.T_infer_train_max),
-                "T_infer_eval": _scaled_int(float(row[3]), config.T_infer_eval_min, config.T_infer_eval_max),
-                "T_learn": _scaled_int(float(row[4]), config.T_learn_min, config.T_learn_max),
-                "optimizer": optimizer,
-                "activation": activation,
-            }
+    trial_idx = 1
+    for batch_idx, batch_size in enumerate(batch_sizes):
+        batch_trials = base_trials + (1 if batch_idx < remainder else 0)
+        if batch_trials <= 0:
+            continue
+
+        sampler = qmc.LatinHypercube(
+            d=7,
+            optimization="random-cd",
+            seed=config.search_seed + benchmark_idx * 10_000 + batch_idx,
         )
+        unit = sampler.random(batch_trials)
+
+        for row in unit:
+            eta_infer = 10.0 ** (config.eta_log10_min + row[0] * (config.eta_log10_max - config.eta_log10_min))
+            eta_learn = 10.0 ** (config.eta_log10_min + row[1] * (config.eta_log10_max - config.eta_log10_min))
+            optimizer = config.optimizers[min(int(row[5] * len(config.optimizers)), len(config.optimizers) - 1)]
+            activation = config.activations[min(int(row[6] * len(config.activations)), len(config.activations) - 1)]
+            trials.append(
+                {
+                    "trial": trial_idx,
+                    "batch_size": int(batch_size),
+                    "eta_infer": float(eta_infer),
+                    "eta_learn": float(eta_learn),
+                    "T_infer_train": _scaled_int(float(row[2]), config.T_infer_train_min, config.T_infer_train_max),
+                    "T_infer_eval": _scaled_int(float(row[3]), config.T_infer_eval_min, config.T_infer_eval_max),
+                    "T_learn": _scaled_int(float(row[4]), config.T_learn_min, config.T_learn_max),
+                    "optimizer": optimizer,
+                    "activation": activation,
+                }
+            )
+            trial_idx += 1
     return trials
 
 
@@ -256,7 +283,7 @@ def run_pcn_hyperparameter_search(
                 dataset_size=config.dataset_size,
                 sample_seed=config.sample_seed + benchmark_idx,
                 split_seed=config.split_seed + benchmark_idx,
-                batch_size=config.batch_size,
+                batch_size=int(trial_spec["batch_size"]),
                 eta_infer=float(trial_spec["eta_infer"]),
                 eta_learn=float(trial_spec["eta_learn"]),
                 T_infer_train=int(trial_spec["T_infer_train"]),
@@ -335,6 +362,7 @@ def run_pcn_hyperparameter_search(
                 "trial": trial,
                 "activation": str(trial_spec["activation"]),
                 "optimizer": str(trial_spec["optimizer"]),
+                "batch_size": int(trial_spec["batch_size"]),
                 "eta_infer": float(trial_spec["eta_infer"]),
                 "eta_learn": float(trial_spec["eta_learn"]),
                 "T_infer_train": int(trial_spec["T_infer_train"]),
@@ -408,11 +436,15 @@ def write_pcn_hyperparameter_search(results: pd.DataFrame, output_path: str | Pa
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run a Latin-hypercube hyperparameter search for the real-valued PCN.")
+    parser = argparse.ArgumentParser(
+        description="Run a batch-stratified Latin-hypercube hyperparameter search for the real-valued PCN."
+    )
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--benchmark", type=str, default=None)
     parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--trials", type=int, default=None)
+    parser.add_argument("--epochs", type=int, default=None)
+    parser.add_argument("--batch-sizes", type=int, nargs="+", default=None)
     args = parser.parse_args(argv)
 
     config = SCRIPT_CONFIG
@@ -422,6 +454,10 @@ def main(argv: list[str] | None = None) -> int:
         config = replace(config, device=args.device)
     if args.trials is not None:
         config = replace(config, trials=args.trials)
+    if args.epochs is not None:
+        config = replace(config, epochs=args.epochs)
+    if args.batch_sizes is not None:
+        config = replace(config, batch_sizes=tuple(args.batch_sizes))
 
     _validate_requested_device(config.device)
 

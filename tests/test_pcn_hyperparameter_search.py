@@ -9,9 +9,9 @@ def test_pcn_hyperparameter_search_smoke_runs_requested_function():
             benchmarks=("ackley",),
             dims=(4, 4, 4),
             epochs=1,
-            trials=2,
+            trials=4,
             dataset_size=32,
-            batch_size=8,
+            batch_sizes=(1, 8),
             probe_size=8,
             device="cpu",
             dtype=torch.float64,
@@ -24,6 +24,7 @@ def test_pcn_hyperparameter_search_smoke_runs_requested_function():
         )
     )
 
-    assert len(results) == 2
+    assert len(results) == 4
     assert set(results["benchmark"]) == {"ackley"}
-    assert {"activation", "optimizer", "val_mae", "status"} <= set(results.columns)
+    assert set(results["batch_size"]) == {1, 8}
+    assert {"activation", "optimizer", "batch_size", "val_mae", "status"} <= set(results.columns)
