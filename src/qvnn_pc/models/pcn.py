@@ -533,7 +533,7 @@ class PredictiveCodingNetwork(nn.Module):
         else:
             result = self.infer_latents(
                 x,
-                y=None,
+                y=y_real,
                 steps=infer_steps,
                 eta_infer=eta_infer,
                 latent_init=latent_init,
