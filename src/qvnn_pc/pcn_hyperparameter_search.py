@@ -43,7 +43,7 @@ class PredictiveCodingSearchConfig:
     sample_seed: int = 0
     split_seed: int = 0
     search_seed: int = 17
-    batch_sizes: tuple[int, ...] = (1, 8, 32, 128, 512)
+    batch_sizes: tuple[int, ...] = (1, 32, 512)
     latent_init: LatentInitName = "feedforward"
     probe_size: int = 128
     device: torch.device | str | None = "cuda" if torch.cuda.is_available() else "cpu"
