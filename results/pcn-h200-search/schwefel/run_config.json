@@ -10,13 +10,17 @@
     20
   ],
   "output_dim": 1,
-  "epochs": 30,
+  "epochs": 80,
   "trials": 24,
   "dataset_size": 30000,
   "sample_seed": 0,
   "split_seed": 0,
   "search_seed": 17,
-  "batch_size": 512,
+  "batch_sizes": [
+    1,
+    32,
+    512
+  ],
   "latent_init": "feedforward",
   "probe_size": 128,
   "device": "cuda",
@@ -48,6 +52,6 @@
     "Adagrad",
     "Adadelta"
   ],
-  "sampler": "scipy.stats.qmc.LatinHypercube(optimization='random-cd')",
+  "sampler": "batch-stratified scipy.stats.qmc.LatinHypercube(optimization='random-cd')",
   "summary_path": "/workspace/results/pcn-h200-search/schwefel/pcn_hyperparameter_search.csv"
 }
