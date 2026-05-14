@@ -6,6 +6,7 @@ import argparse
 from dataclasses import dataclass, replace
 from datetime import datetime
 import json
+import math
 from pathlib import Path
 import time
 
@@ -25,7 +26,6 @@ from qvnn_pc.pcn_benchmark import (
     DEFAULT_RESULTS_ROOT,
     PredictiveCodingBenchmarkConfig,
     _canonical_benchmark_name,
-    _fit_model,
     _plot_history,
     _standardized_real_split,
     _validate_requested_device,
@@ -48,16 +48,22 @@ class PredictiveCodingSearchConfig:
     probe_size: int = 128
     device: torch.device | str | None = "cuda" if torch.cuda.is_available() else "cpu"
     dtype: torch.dtype = torch.float32
-    eta_log10_min: float = -7.0
-    eta_log10_max: float = -2.0
-    T_infer_train_min: int = 4
-    T_infer_train_max: int = 64
-    T_infer_eval_min: int = 4
-    T_infer_eval_max: int = 64
+    eta_log10_min: float = -5.0
+    eta_log10_max: float = -1.5
+    T_infer_train_min: int = 8
+    T_infer_train_max: int = 48
+    T_infer_eval_min: int = 8
+    T_infer_eval_max: int = 32
     T_learn_min: int = 1
-    T_learn_max: int = 12
+    T_learn_max: int = 8
     activations: tuple[ActivationName, ...] = ("tanh", "sigmoid", "swish", "leakyrelu")
     optimizers: tuple[OptimizerName, ...] = ("SGD", "Adagrad", "Adadelta")
+    search_eval_every: int = 5
+    search_train_eval_size: int = 2048
+    search_val_eval_size: int = 2048
+    early_stopping: bool = True
+    early_stopping_patience: int = 6
+    early_stopping_min_delta: float = 1e-4
 
 
 SCRIPT_CONFIG = PredictiveCodingSearchConfig()
@@ -103,6 +109,12 @@ def _save_run_metadata(run_dir: Path, config: PredictiveCodingSearchConfig, *, s
         "T_learn_range": [config.T_learn_min, config.T_learn_max],
         "activations": list(config.activations),
         "optimizers": list(config.optimizers),
+        "search_eval_every": config.search_eval_every,
+        "search_train_eval_size": config.search_train_eval_size,
+        "search_val_eval_size": config.search_val_eval_size,
+        "early_stopping": config.early_stopping,
+        "early_stopping_patience": config.early_stopping_patience,
+        "early_stopping_min_delta": config.early_stopping_min_delta,
         "sampler": "batch-stratified scipy.stats.qmc.LatinHypercube(optimization='random-cd')",
         "summary_path": str(summary_path),
     }
@@ -210,6 +222,168 @@ def _save_trial_history(run_dir: Path, benchmark: str, trial: int, history: dict
     return path
 
 
+def _move_real_split_to_device(
+    real_split: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+    device: torch.device | str | None,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    if device is None:
+        return real_split
+    target_device = torch.device(device)
+    return tuple(tensor.to(target_device) for tensor in real_split)  # type: ignore[return-value]
+
+
+def _screening_subset(x: torch.Tensor, y: torch.Tensor, max_size: int) -> tuple[torch.Tensor, torch.Tensor]:
+    if max_size <= 0 or x.shape[0] <= max_size:
+        return x, y
+    return x[:max_size], y[:max_size]
+
+
+def _search_history_template() -> dict[str, list[float] | list[int] | list[list[float]] | float | int | str]:
+    return {
+        "eval_epoch": [],
+        "train_mse": [],
+        "train_mae": [],
+        "train_mape": [],
+        "train_r2": [],
+        "train_free_energy": [],
+        "train_reconstruction_mse": [],
+        "train_supervised_mse": [],
+        "validation_mse": [],
+        "validation_mae": [],
+        "validation_mape": [],
+        "validation_r2": [],
+        "validation_free_energy": [],
+        "validation_reconstruction_mse": [],
+        "validation_supervised_mse": [],
+        "probe_train_free_energy_trace": [],
+        "probe_train_supervised_mse_trace": [],
+        "probe_train_latent_grad_trace": [],
+        "probe_val_free_energy_trace": [],
+        "probe_val_supervised_mse_trace": [],
+        "probe_val_latent_grad_trace": [],
+    }
+
+
+def _metrics_are_finite(metrics: dict[str, float | dict[str, list[float]]]) -> bool:
+    return all(math.isfinite(value) for value in metrics.values() if isinstance(value, float))
+
+
+def _fit_model_for_search(
+    model: PredictiveCodingNetwork,
+    *,
+    x_train: torch.Tensor,
+    y_train: torch.Tensor,
+    x_val: torch.Tensor,
+    y_val: torch.Tensor,
+    benchmark_config: PredictiveCodingBenchmarkConfig,
+    search_config: PredictiveCodingSearchConfig,
+    shuffle_generator: torch.Generator,
+) -> tuple[
+    dict[str, list[float] | list[int] | list[list[float]] | float | int | str],
+    dict[str, float | dict[str, list[float]]],
+    dict[str, float | dict[str, list[float]]],
+    dict[str, torch.Tensor],
+]:
+    history = _search_history_template()
+    history["status"] = "completed"
+    best_state = {name: tensor.detach().cpu().clone() for name, tensor in model.state_dict().items()}
+    best_train_metrics: dict[str, float | dict[str, list[float]]] = {
+        "mse": float("nan"),
+        "mae": float("nan"),
+        "mape": float("nan"),
+        "r2": float("nan"),
+    }
+    best_val_metrics: dict[str, float | dict[str, list[float]]] = {
+        "mse": float("nan"),
+        "mae": float("inf"),
+        "mape": float("nan"),
+        "r2": float("nan"),
+    }
+    best_validation_loss = float("inf")
+    epochs_without_improvement = 0
+    epochs_ran = 0
+    eval_every = max(1, int(search_config.search_eval_every))
+    train_eval_x, train_eval_y = _screening_subset(x_train, y_train, search_config.search_train_eval_size)
+    val_eval_x, val_eval_y = _screening_subset(x_val, y_val, search_config.search_val_eval_size)
+
+    start = time.perf_counter()
+    for epoch_idx in range(benchmark_config.epochs):
+        epochs_ran = epoch_idx + 1
+        permutation = torch.randperm(x_train.shape[0], generator=shuffle_generator, device="cpu")
+        try:
+            for batch_start in range(0, x_train.shape[0], benchmark_config.batch_size):
+                batch_indices = permutation[batch_start:batch_start + benchmark_config.batch_size]
+                model.train_batch(
+                    x_train[batch_indices],
+                    y_train[batch_indices],
+                    eta_infer=benchmark_config.eta_infer,
+                    eta_learn=benchmark_config.eta_learn,
+                    T_infer=benchmark_config.T_infer_train,
+                    T_learn=benchmark_config.T_learn,
+                    latent_init=benchmark_config.latent_init,
+                )
+        except FloatingPointError:
+            history["status"] = "non_finite"
+            break
+
+        should_evaluate = (
+            epoch_idx == 0
+            or epochs_ran == benchmark_config.epochs
+            or epochs_ran % eval_every == 0
+        )
+        if not should_evaluate:
+            continue
+
+        try:
+            train_metrics = model.evaluate(
+                train_eval_x,
+                train_eval_y,
+                infer_steps=benchmark_config.T_infer_eval,
+                eta_infer=benchmark_config.eta_infer,
+                latent_init=benchmark_config.latent_init,
+            )
+            val_metrics = model.evaluate(
+                val_eval_x,
+                val_eval_y,
+                infer_steps=benchmark_config.T_infer_eval,
+                eta_infer=benchmark_config.eta_infer,
+                latent_init=benchmark_config.latent_init,
+            )
+        except FloatingPointError:
+            history["status"] = "non_finite"
+            break
+
+        if not _metrics_are_finite(train_metrics) or not _metrics_are_finite(val_metrics):
+            history["status"] = "non_finite"
+            break
+
+        history["eval_epoch"].append(epochs_ran)  # type: ignore[index]
+        for key in ("mse", "mae", "mape", "r2", "free_energy", "reconstruction_mse", "supervised_mse"):
+            history[f"train_{key}"].append(float(train_metrics[key]))  # type: ignore[index]
+            history[f"validation_{key}"].append(float(val_metrics[key]))  # type: ignore[index]
+
+        validation_loss = float(val_metrics["mae"])
+        if validation_loss < best_validation_loss - search_config.early_stopping_min_delta:
+            best_validation_loss = validation_loss
+            best_train_metrics = train_metrics
+            best_val_metrics = val_metrics
+            best_state = {name: tensor.detach().cpu().clone() for name, tensor in model.state_dict().items()}
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+
+        if search_config.early_stopping and epochs_without_improvement >= search_config.early_stopping_patience:
+            history["status"] = "early_stopped"
+            break
+
+    model.load_state_dict(best_state)
+    history["runtime"] = time.perf_counter() - start
+    history["best_validation_loss"] = best_validation_loss
+    history["epochs_ran"] = epochs_ran
+    history["evals_ran"] = len(history["validation_mae"])  # type: ignore[arg-type]
+    return history, best_train_metrics, best_val_metrics, best_state
+
+
 def _save_best_artifacts(
     run_dir: Path,
     *,
@@ -249,6 +423,11 @@ def run_pcn_hyperparameter_search(
     *,
     run_dir: Path | None = None,
 ) -> pd.DataFrame:
+    if run_dir is not None:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        for child in ("trial_history", "models", "evaluations", "plots"):
+            (run_dir / child).mkdir(exist_ok=True)
+
     rows: list[dict[str, float | int | str]] = []
 
     for benchmark_idx, benchmark_name in enumerate(config.benchmarks):
@@ -261,7 +440,10 @@ def run_pcn_hyperparameter_search(
             device=None,
             dtype=config.dtype,
         )
-        x_train, y_train, x_val, y_val, x_test, y_test = _standardized_real_split(split)
+        x_train, y_train, x_val, y_val, x_test, y_test = _move_real_split_to_device(
+            _standardized_real_split(split),
+            config.device,
+        )
         trial_specs = _sample_trial_grid(config, benchmark_idx=benchmark_idx)
 
         best_val_mae = float("inf")
@@ -291,7 +473,7 @@ def run_pcn_hyperparameter_search(
                 T_learn=int(trial_spec["T_learn"]),
                 latent_init=config.latent_init,
                 probe_size=config.probe_size,
-                early_stopping=False,
+                early_stopping=config.early_stopping,
                 device=config.device,
                 dtype=config.dtype,
             )
@@ -311,37 +493,18 @@ def run_pcn_hyperparameter_search(
             status = "completed"
 
             try:
-                history = _fit_model(
+                history, train_metrics, val_metrics, trial_best_state = _fit_model_for_search(
                     model,
                     x_train=x_train,
                     y_train=y_train,
                     x_val=x_val,
                     y_val=y_val,
-                    config=benchmark_config,
+                    benchmark_config=benchmark_config,
+                    search_config=config,
                     shuffle_generator=shuffle_generator,
                 )
                 status = str(history["status"])
-                train_metrics = model.evaluate(
-                    x_train,
-                    y_train,
-                    infer_steps=benchmark_config.T_infer_eval,
-                    eta_infer=benchmark_config.eta_infer,
-                    latent_init=benchmark_config.latent_init,
-                )
-                val_metrics = model.evaluate(
-                    x_val,
-                    y_val,
-                    infer_steps=benchmark_config.T_infer_eval,
-                    eta_infer=benchmark_config.eta_infer,
-                    latent_init=benchmark_config.latent_init,
-                )
-                test_metrics = model.evaluate(
-                    x_test,
-                    y_test,
-                    infer_steps=benchmark_config.T_infer_eval,
-                    eta_infer=benchmark_config.eta_infer,
-                    latent_init=benchmark_config.latent_init,
-                )
+                test_metrics = {"mse": float("nan"), "mae": float("nan"), "mape": float("nan"), "r2": float("nan")}
             except (FloatingPointError, RuntimeError, ValueError) as exc:
                 history = {
                     "status": "failed",
@@ -379,6 +542,9 @@ def run_pcn_hyperparameter_search(
                 "test_mse": float(test_metrics["mse"]),
                 "val_r2": float(val_metrics["r2"]),
                 "test_r2": float(test_metrics["r2"]),
+                "screening_train_size": min(config.search_train_eval_size, x_train.shape[0]),
+                "screening_val_size": min(config.search_val_eval_size, x_val.shape[0]),
+                "evals": int(history.get("evals_ran", 0)),
             }
             rows.append(row)
 
@@ -386,18 +552,10 @@ def run_pcn_hyperparameter_search(
                 best_val_mae = float(row["val_mae"])
                 best_row = row
                 best_history = history
-                best_evaluation = {
-                    "train": train_metrics,
-                    "val": val_metrics,
-                    "test": test_metrics,
-                }
-                best_state = {name: tensor.detach().cpu().clone() for name, tensor in model.state_dict().items()}
+                best_evaluation = None
+                best_state = trial_best_state
 
-        benchmark_results = pd.DataFrame([row for row in rows if row["benchmark"] == benchmark])
-        if run_dir is not None:
-            _plot_search_results(run_dir, benchmark, benchmark_results)
-
-        if best_row is None or best_history is None or best_evaluation is None or best_state is None:
+        if best_row is None or best_history is None or best_state is None:
             raise RuntimeError(f"No successful PCN hyperparameter-search trial completed for benchmark {benchmark!r}.")
 
         best_model = PredictiveCodingNetwork(
@@ -411,6 +569,50 @@ def run_pcn_hyperparameter_search(
             dtype=config.dtype,
         )
         best_model.load_state_dict(best_state)
+        full_train_metrics = best_model.evaluate(
+            x_train,
+            y_train,
+            infer_steps=int(best_row["T_infer_eval"]),
+            eta_infer=float(best_row["eta_infer"]),
+            latent_init=config.latent_init,
+        )
+        full_val_metrics = best_model.evaluate(
+            x_val,
+            y_val,
+            infer_steps=int(best_row["T_infer_eval"]),
+            eta_infer=float(best_row["eta_infer"]),
+            latent_init=config.latent_init,
+        )
+        full_test_metrics = best_model.evaluate(
+            x_test,
+            y_test,
+            infer_steps=int(best_row["T_infer_eval"]),
+            eta_infer=float(best_row["eta_infer"]),
+            latent_init=config.latent_init,
+        )
+        best_evaluation = {
+            "train": full_train_metrics,
+            "val": full_val_metrics,
+            "test": full_test_metrics,
+        }
+        best_row.update(
+            {
+                "train_mae": float(full_train_metrics["mae"]),
+                "val_mae": float(full_val_metrics["mae"]),
+                "test_mae": float(full_test_metrics["mae"]),
+                "train_mse": float(full_train_metrics["mse"]),
+                "val_mse": float(full_val_metrics["mse"]),
+                "test_mse": float(full_test_metrics["mse"]),
+                "val_r2": float(full_val_metrics["r2"]),
+                "test_r2": float(full_test_metrics["r2"]),
+                "full_evaluation": 1,
+            }
+        )
+
+        benchmark_results = pd.DataFrame([row for row in rows if row["benchmark"] == benchmark])
+        if run_dir is not None:
+            _plot_search_results(run_dir, benchmark, benchmark_results)
+
         if run_dir is not None:
             _save_best_artifacts(
                 run_dir,
@@ -442,9 +644,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--benchmark", type=str, default=None)
     parser.add_argument("--device", type=str, default=None)
-    parser.add_argument("--trials", type=int, default=None)
-    parser.add_argument("--epochs", type=int, default=None)
-    parser.add_argument("--batch-sizes", type=int, nargs="+", default=None)
     args = parser.parse_args(argv)
 
     config = SCRIPT_CONFIG
@@ -452,12 +651,6 @@ def main(argv: list[str] | None = None) -> int:
         config = replace(config, benchmarks=(_canonical_benchmark_name(args.benchmark),))
     if args.device is not None:
         config = replace(config, device=args.device)
-    if args.trials is not None:
-        config = replace(config, trials=args.trials)
-    if args.epochs is not None:
-        config = replace(config, epochs=args.epochs)
-    if args.batch_sizes is not None:
-        config = replace(config, batch_sizes=tuple(args.batch_sizes))
 
     _validate_requested_device(config.device)
 

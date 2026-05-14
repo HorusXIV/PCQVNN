@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=pcqvnn-pcn-search
 #SBATCH --partition=h200
-#SBATCH --array=0-3%2
+#SBATCH --array=0-3%4
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
@@ -16,12 +16,13 @@ PROJECT_ROOT="${PROJECT_ROOT:-$SLURM_SUBMIT_DIR}"
 CONTAINER_IMAGE="${CONTAINER_IMAGE:-$PROJECT_ROOT/cluster/pcqvnn.sif}"
 RESULTS_ROOT="${RESULTS_ROOT:-$PROJECT_ROOT/results}"
 RUN_NAME="${RUN_NAME:-pcn-h200-search}"
-TRIALS="${TRIALS:-24}"
 
 BENCHMARKS=(ackley griewank rastrigin schwefel)
 BENCHMARK="${BENCHMARKS[$SLURM_ARRAY_TASK_ID]}"
 
 mkdir -p "$RESULTS_ROOT" "$PROJECT_ROOT/logs"
+export MPLCONFIGDIR="${MPLCONFIGDIR:-$RESULTS_ROOT/matplotlib-cache}"
+mkdir -p "$MPLCONFIGDIR"
 
 if command -v apptainer >/dev/null 2>&1; then
     RUNTIME="apptainer"
@@ -52,7 +53,6 @@ OUTPUT_PATH_IN_CONTAINER="$RESULTS_ROOT_IN_CONTAINER/$RUN_NAME/$BENCHMARK/pcn_hy
 
 echo "Job started at $(date)"
 echo "Benchmark: $BENCHMARK"
-echo "Trials: $TRIALS"
 echo "Run output: $OUTPUT_PATH_IN_CONTAINER"
 
 "$RUNTIME" exec \
@@ -62,6 +62,5 @@ echo "Run output: $OUTPUT_PATH_IN_CONTAINER"
     python -m qvnn_pc.pcn_hyperparameter_search \
     --benchmark "$BENCHMARK" \
     --device cuda \
-    --trials "$TRIALS" \
     --output "$OUTPUT_PATH_IN_CONTAINER" \
     "$@"
