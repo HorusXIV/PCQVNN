@@ -107,12 +107,13 @@ class PCNLayer(nn.Module):
     ) -> None:
         super().__init__()
         self.W = nn.Parameter(torch.empty(out_dim, in_dim, device=device, dtype=dtype))
+        self.bias = nn.Parameter(torch.zeros(out_dim, device=device, dtype=dtype))
         nn.init.xavier_uniform_(self.W)
         self.activation_fn = activation_fn
         self.activation_deriv = activation_deriv
 
     def forward(self, x_above: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        pre_activation = x_above @ self.W.T
+        pre_activation = x_above @ self.W.T + self.bias
         prediction = self.activation_fn(pre_activation)
         return prediction, pre_activation
 
@@ -163,12 +164,17 @@ class PredictiveCodingNetwork(nn.Module):
             for layer_idx in range(self.L)
         ])
         self.readout_weight = nn.Parameter(torch.empty(self.output_dim, self.dims[-1], device=device, dtype=dtype))
+        self.readout_bias = nn.Parameter(torch.zeros(self.output_dim, device=device, dtype=dtype))
         nn.init.xavier_uniform_(self.readout_weight)
         for layer_idx, layer in enumerate(self.layers):
             self.register_buffer(f"_weight_acc_{layer_idx}", torch.zeros_like(layer.W))
             self.register_buffer(f"_weight_delta_acc_{layer_idx}", torch.zeros_like(layer.W))
+            self.register_buffer(f"_bias_acc_{layer_idx}", torch.zeros_like(layer.bias))
+            self.register_buffer(f"_bias_delta_acc_{layer_idx}", torch.zeros_like(layer.bias))
         self.register_buffer("_readout_acc", torch.zeros_like(self.readout_weight))
         self.register_buffer("_readout_delta_acc", torch.zeros_like(self.readout_weight))
+        self.register_buffer("_readout_bias_acc", torch.zeros_like(self.readout_bias))
+        self.register_buffer("_readout_bias_delta_acc", torch.zeros_like(self.readout_bias))
 
     def _prepare_input(self, x: torch.Tensor) -> torch.Tensor:
         if x.ndim != 2:
@@ -187,13 +193,19 @@ class PredictiveCodingNetwork(nn.Module):
         return y.to(device=self.readout_weight.device, dtype=self.readout_weight.dtype)
 
     def _readout(self, latent: torch.Tensor) -> torch.Tensor:
-        return F.linear(latent, self.readout_weight)
+        return F.linear(latent, self.readout_weight, self.readout_bias)
 
     def _weight_accumulator(self, layer_idx: int) -> torch.Tensor:
         return cast(torch.Tensor, getattr(self, f"_weight_acc_{layer_idx}"))
 
     def _weight_delta_accumulator(self, layer_idx: int) -> torch.Tensor:
         return cast(torch.Tensor, getattr(self, f"_weight_delta_acc_{layer_idx}"))
+
+    def _bias_accumulator(self, layer_idx: int) -> torch.Tensor:
+        return cast(torch.Tensor, getattr(self, f"_bias_acc_{layer_idx}"))
+
+    def _bias_delta_accumulator(self, layer_idx: int) -> torch.Tensor:
+        return cast(torch.Tensor, getattr(self, f"_bias_delta_acc_{layer_idx}"))
 
     @torch.no_grad()
     def _apply_update(
@@ -294,7 +306,10 @@ class PredictiveCodingNetwork(nn.Module):
     ) -> tuple[list[torch.Tensor], torch.Tensor]:
         errors, gain_modulated_errors, _ = self.compute_errors(states)
         y_hat = self._readout(states[-1])
-        top_error = None if target is None else (y_hat - target) @ self.readout_weight
+        top_error = None
+        if target is not None:
+            readout_feedback_scale = self.readout_weight.square().sum().clamp_min(1.0)
+            top_error = ((y_hat - target) @ self.readout_weight) / readout_feedback_scale
 
         gradients: list[torch.Tensor] = []
         for latent_idx in range(1, self.L + 1):
@@ -471,6 +486,7 @@ class PredictiveCodingNetwork(nn.Module):
             _, gain_modulated_errors, _ = self.compute_errors(states)
             for layer_idx, layer in enumerate(self.layers):
                 gradient = -(gain_modulated_errors[layer_idx].T @ states[layer_idx + 1]) / batch_size
+                bias_gradient = -gain_modulated_errors[layer_idx].mean(dim=0)
                 self._apply_update(
                     param=layer.W,
                     gradient=gradient,
@@ -478,9 +494,20 @@ class PredictiveCodingNetwork(nn.Module):
                     delta_accumulator=self._weight_delta_accumulator(layer_idx),
                     lr=eta_learn,
                 )
+                self._apply_update(
+                    param=layer.bias,
+                    gradient=bias_gradient,
+                    accumulator=self._bias_accumulator(layer_idx),
+                    delta_accumulator=self._bias_delta_accumulator(layer_idx),
+                    lr=eta_learn,
+                )
 
-            output_error = self._readout(states[-1]) - y_real
-            readout_gradient = output_error.T @ states[-1] / batch_size
+            prediction_latents = self.feedforward_latents(x_real)
+            prediction_top_latent = prediction_latents[-1]
+            output_error = self._readout(prediction_top_latent) - y_real
+            readout_update_scale = (prediction_top_latent.square().sum(dim=1) + 1.0).mean().clamp_min(1.0)
+            readout_gradient = (output_error.T @ prediction_top_latent / batch_size) / readout_update_scale
+            readout_bias_gradient = output_error.mean(dim=0) / readout_update_scale
             self._apply_update(
                 param=self.readout_weight,
                 gradient=readout_gradient,
@@ -488,11 +515,20 @@ class PredictiveCodingNetwork(nn.Module):
                 delta_accumulator=cast(torch.Tensor, self._readout_delta_acc),
                 lr=eta_learn,
             )
-            params = [layer.W for layer in self.layers] + [self.readout_weight]
+            self._apply_update(
+                param=self.readout_bias,
+                gradient=readout_bias_gradient,
+                accumulator=cast(torch.Tensor, self._readout_bias_acc),
+                delta_accumulator=cast(torch.Tensor, self._readout_bias_delta_acc),
+                lr=eta_learn,
+            )
+            params = [param for layer in self.layers for param in (layer.W, layer.bias)]
+            params.extend([self.readout_weight, self.readout_bias])
             if not _all_finite(tuple(params)):
                 raise FloatingPointError("PCN weights became non-finite during learning.")
 
-        energy_metrics, y_hat = self._compute_energy(states, target=y_real)
+        prediction_states = [x_real, *self.feedforward_latents(x_real)]
+        energy_metrics, y_hat = self._compute_energy(prediction_states, target=y_real)
         if not _all_finite((y_hat,)):
             raise FloatingPointError("PCN prediction became non-finite after learning.")
 
@@ -533,7 +569,7 @@ class PredictiveCodingNetwork(nn.Module):
         else:
             result = self.infer_latents(
                 x,
-                y=y_real,
+                y=None,
                 steps=infer_steps,
                 eta_infer=eta_infer,
                 latent_init=latent_init,
