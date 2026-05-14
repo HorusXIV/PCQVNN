@@ -1,14 +1,14 @@
 # Fdb version 4
-["biber pcqvnn_report"] 1778265932.20729 "pcqvnn_report.bcf" "pcqvnn_report.bbl" "pcqvnn_report" 1778266083.83633 0
+["biber pcqvnn_report"] 1778265932.20729 "pcqvnn_report.bcf" "pcqvnn_report.bbl" "pcqvnn_report" 1778585006.22393 0
   "literature/Citations.bib" 1778265952.36569 4902 4451c15fda284c5a480d3a240eb5fa08 ""
-  "pcqvnn_report.bcf" 1778266083.73268 108404 304e83a864b54c0ea57928eae184125b "pdflatex"
+  "pcqvnn_report.bcf" 1778585006.11888 108404 304e83a864b54c0ea57928eae184125b "pdflatex"
   (generated)
   "pcqvnn_report.bbl"
   "pcqvnn_report.blg"
   (rewritten before read)
-["pdflatex"] 1778266082.61481 "/home/lukas/src/Sem4/OML/oml_fs2026/PCQVNN/report/pcqvnn_report.tex" "pcqvnn_report.pdf" "pcqvnn_report" 1778266083.83659 0
+["pdflatex"] 1778585004.88348 "/home/lukas/src/Sem4/OML/oml_fs2026/PCQVNN/report/pcqvnn_report.tex" "pcqvnn_report.pdf" "pcqvnn_report" 1778585006.22415 0
   "/etc/texmf/web2c/texmf.cnf" 1771235181.68999 475 c0e671620eb5563b2130f56340a5fde8 ""
-  "/home/lukas/src/Sem4/OML/oml_fs2026/PCQVNN/report/pcqvnn_report.tex" 1778266082.40667 1959 dfa401e32c253a786de81db7b946b954 ""
+  "/home/lukas/src/Sem4/OML/oml_fs2026/PCQVNN/report/pcqvnn_report.tex" 1778583616.7639 1959 e01170a06abf114e1cd3b50b5230ed7f ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/adobe/times/ptmr8t.tfm" 1136768653 6672 e3ab9e37e925f3045c9005e6d1473d56 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/symbols/msam10.tfm" 1246382020 916 f87d7c45f9c908e672703b83b72241a3 ""
@@ -219,7 +219,6 @@
   "/usr/share/texmf/fonts/enc/dvips/lm/lm-mathsy.enc" 1202520719 2840 216e6e45ad352e2456e1149f28885bee ""
   "/usr/share/texmf/fonts/enc/dvips/lm/lm-rm.enc" 1202520719 2327 9d6df24f9c4f7368395224341a95523a ""
   "/usr/share/texmf/fonts/enc/dvips/lm/lm-ts1.enc" 1254269338 3031 6c4d3515bf7115d8518af1c9ab97ca44 ""
-  "/usr/share/texmf/fonts/tfm/public/lm/ec-lmbx10.tfm" 1254269338 12076 b54175e02101bea1addf6b2d0197ed12 ""
   "/usr/share/texmf/fonts/tfm/public/lm/ec-lmbx12.tfm" 1254269338 12088 d750ac78274fa7c9f73ba09914c04f8a ""
   "/usr/share/texmf/fonts/tfm/public/lm/ec-lmcsc10.tfm" 1254269338 11276 116dd5bea6621ce4a1999f96d876084c ""
   "/usr/share/texmf/fonts/tfm/public/lm/ec-lmr10.tfm" 1254269338 12056 7e13df7fe4cbce21b072ba7c4f4deb6e ""
@@ -280,17 +279,17 @@
   "fhnwreport.cls" 1778246679.95747 6398 9e23193f5e7e35e16db58498a0a680a3 ""
   "graphics/FHNW_HSI_DE.pdf" 1778246679.88399 41408 2ee6bd26b48aa7c952bfc59f5c00a1a5 ""
   "graphics/titleimage.png" 1778246679.88579 60530 6be0157bb77547173c3f87d7b85110e1 ""
-  "pcqvnn_report.aux" 1778266083.72908 3781 0ba74ff751f164277263ee7be631c114 "pdflatex"
+  "pcqvnn_report.aux" 1778585006.11413 3778 1e9e7dacb19baa15f236fc7058c39fc5 "pdflatex"
   "pcqvnn_report.bbl" 1778265932.72284 12121 c4a587407df309730d2fa89595f2efa4 "biber pcqvnn_report"
-  "pcqvnn_report.out" 1778266083.73068 1920 f31b7da298bf58f6b940c490f0352e17 "pdflatex"
-  "pcqvnn_report.run.xml" 1778266083.73498 2536 bf3ef76c3083ee6dbedcfb9c6f2852cb "pdflatex"
-  "pcqvnn_report.tex" 1778266082.40667 1959 dfa401e32c253a786de81db7b946b954 ""
-  "sections/abstract.tex" 1778259331.42413 549 69d29562988c648218cb6bb20cc1ed2d ""
-  "sections/architektur.tex" 1778263172.93727 34 5bc05786094723c2a4e7e4f2724a842f ""
-  "sections/einleitung.tex" 1778263308.38994 5106 abae26ab73207b247da3874c0fc82caa ""
-  "sections/experimente.tex" 1778263165.58017 34 11c2d94781359fc3641c13a5820b7ade ""
+  "pcqvnn_report.out" 1778585006.11588 1905 60ab958641624a931173bc279d274ade "pdflatex"
+  "pcqvnn_report.run.xml" 1778585006.11989 2536 bf3ef76c3083ee6dbedcfb9c6f2852cb "pdflatex"
+  "pcqvnn_report.tex" 1778583616.7639 1959 e01170a06abf114e1cd3b50b5230ed7f ""
+  "sections/abstract.tex" 1778583376.13384 431 cd67378a2d11852ed42fb34b7521897e ""
+  "sections/architektur.tex" 1778585003.42597 35 62a0287d12073529a603471893d8ee51 ""
+  "sections/einleitung.tex" 1778583459.90497 5106 abae26ab73207b247da3874c0fc82caa ""
+  "sections/experimente.tex" 1778585003.42519 31 0f96f6034ca0ba3ebd421f5e52c4d0cc ""
   "sections/grundlagen.tex" 1778265952.36569 15811 169f8e76d1c4c934de2b7bf4cf8a34bf ""
-  "sections/schluss.tex" 1778263235.69258 47 a54df5076c75a94b5e66ceff7a24777a ""
+  "sections/schluss.tex" 1778585003.34506 47 a54df5076c75a94b5e66ceff7a24777a ""
   (generated)
   "pcqvnn_report.aux"
   "pcqvnn_report.bcf"
