@@ -11,7 +11,7 @@
   ],
   "output_dim": 1,
   "epochs": 80,
-  "trials": 24,
+  "trials": 48,
   "dataset_size": 30000,
   "sample_seed": 0,
   "split_seed": 0,
@@ -26,20 +26,20 @@
   "device": "cuda",
   "dtype": "torch.float32",
   "eta_log10_range": [
-    -7.0,
-    -2.0
+    -5.0,
+    -1.5
   ],
   "T_infer_train_range": [
-    4,
-    64
+    8,
+    48
   ],
   "T_infer_eval_range": [
-    4,
-    64
+    8,
+    32
   ],
   "T_learn_range": [
     1,
-    12
+    8
   ],
   "activations": [
     "tanh",
@@ -52,6 +52,12 @@
     "Adagrad",
     "Adadelta"
   ],
+  "search_eval_every": 5,
+  "search_train_eval_size": 2048,
+  "search_val_eval_size": 2048,
+  "early_stopping": true,
+  "early_stopping_patience": 6,
+  "early_stopping_min_delta": 0.0001,
   "sampler": "batch-stratified scipy.stats.qmc.LatinHypercube(optimization='random-cd')",
   "summary_path": "/workspace/results/pcn-h200-search/rastrigin/pcn_hyperparameter_search.csv"
 }
