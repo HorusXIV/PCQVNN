@@ -240,7 +240,7 @@ class PredictiveCodingNetwork(nn.Module):
         current = self._prepare_input(x)
         latents: list[torch.Tensor] = []
         for layer in self.layers:
-            current = layer.activation_fn(current @ layer.W)
+            current = layer.activation_fn((current - layer.bias) @ layer.W)
             latents.append(current)
         return latents
 

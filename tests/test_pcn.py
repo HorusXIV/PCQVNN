@@ -58,6 +58,17 @@ def test_pcn_readout_bias_learns_constant_target():
     assert torch.all(model.readout_bias > initial_bias)
 
 
+def test_pcn_feedforward_latents_account_for_generative_bias():
+    model = PredictiveCodingNetwork([1, 1], output_dim=1, activation="tanh", prediction_inference_steps=1)
+    with torch.no_grad():
+        model.layers[0].W.fill_(1.0)
+        model.layers[0].bias.fill_(0.5)
+
+    latent = model.feedforward_latents(torch.tensor([[1.5]]))[0]
+
+    torch.testing.assert_close(latent, torch.tanh(torch.tensor([[1.0]])))
+
+
 def test_pcn_evaluate_does_not_clamp_target_during_prediction():
     model = PredictiveCodingNetwork([1, 1], output_dim=1, prediction_inference_steps=1)
     with torch.no_grad():
