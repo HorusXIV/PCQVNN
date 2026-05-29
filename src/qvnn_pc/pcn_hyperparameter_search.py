@@ -64,6 +64,7 @@ class PredictiveCodingSearchConfig:
     early_stopping: bool = True
     early_stopping_patience: int = 6
     early_stopping_min_delta: float = 1e-4
+    max_trial_runtime_seconds: float | None = 1800.0
 
 
 SCRIPT_CONFIG = PredictiveCodingSearchConfig()
@@ -115,7 +116,9 @@ def _save_run_metadata(run_dir: Path, config: PredictiveCodingSearchConfig, *, s
         "early_stopping": config.early_stopping,
         "early_stopping_patience": config.early_stopping_patience,
         "early_stopping_min_delta": config.early_stopping_min_delta,
+        "max_trial_runtime_seconds": config.max_trial_runtime_seconds,
         "sampler": "batch-stratified scipy.stats.qmc.LatinHypercube(optimization='random-cd')",
+        "trial_order": "round-robin across batch sizes",
         "summary_path": str(summary_path),
     }
     with (run_dir / "run_config.json").open("w", encoding="utf-8") as handle:
@@ -148,8 +151,7 @@ def _sample_trial_grid(
 
     base_trials = config.trials // len(batch_sizes)
     remainder = config.trials % len(batch_sizes)
-    trials: list[dict[str, float | int | str]] = []
-    trial_idx = 1
+    trials_by_batch: list[list[dict[str, float | int | str]]] = []
     for batch_idx, batch_size in enumerate(batch_sizes):
         batch_trials = base_trials + (1 if batch_idx < remainder else 0)
         if batch_trials <= 0:
@@ -162,14 +164,14 @@ def _sample_trial_grid(
         )
         unit = sampler.random(batch_trials)
 
+        batch_specs: list[dict[str, float | int | str]] = []
         for row in unit:
             eta_infer = 10.0 ** (config.eta_log10_min + row[0] * (config.eta_log10_max - config.eta_log10_min))
             eta_learn = 10.0 ** (config.eta_log10_min + row[1] * (config.eta_log10_max - config.eta_log10_min))
             optimizer = config.optimizers[min(int(row[5] * len(config.optimizers)), len(config.optimizers) - 1)]
             activation = config.activations[min(int(row[6] * len(config.activations)), len(config.activations) - 1)]
-            trials.append(
+            batch_specs.append(
                 {
-                    "trial": trial_idx,
                     "batch_size": int(batch_size),
                     "eta_infer": float(eta_infer),
                     "eta_learn": float(eta_learn),
@@ -180,7 +182,16 @@ def _sample_trial_grid(
                     "activation": activation,
                 }
             )
-            trial_idx += 1
+        trials_by_batch.append(batch_specs)
+
+    trials: list[dict[str, float | int | str]] = []
+    for round_idx in range(max(len(batch_specs) for batch_specs in trials_by_batch)):
+        for batch_specs in trials_by_batch:
+            if round_idx < len(batch_specs):
+                trials.append(batch_specs[round_idx])
+
+    for trial_idx, trial in enumerate(trials, start=1):
+        trial["trial"] = trial_idx
     return trials
 
 
@@ -220,6 +231,15 @@ def _save_trial_history(run_dir: Path, benchmark: str, trial: int, history: dict
     with path.open("w", encoding="utf-8") as handle:
         json.dump(history, handle, indent=2)
     return path
+
+
+def _save_progress_summary(run_dir: Path, rows: list[dict[str, float | int | str]]) -> None:
+    if not rows:
+        return
+    pd.DataFrame(rows).sort_values(["benchmark", "trial"]).to_csv(
+        run_dir / "pcn_hyperparameter_search_progress.csv",
+        index=False,
+    )
 
 
 def _move_real_split_to_device(
@@ -332,6 +352,12 @@ def _fit_model_for_search(
             or epochs_ran % eval_every == 0
         )
         if not should_evaluate:
+            if (
+                search_config.max_trial_runtime_seconds is not None
+                and time.perf_counter() - start >= search_config.max_trial_runtime_seconds
+            ):
+                history["status"] = "time_capped"
+                break
             continue
 
         try:
@@ -374,6 +400,12 @@ def _fit_model_for_search(
 
         if search_config.early_stopping and epochs_without_improvement >= search_config.early_stopping_patience:
             history["status"] = "early_stopped"
+            break
+        if (
+            search_config.max_trial_runtime_seconds is not None
+            and time.perf_counter() - start >= search_config.max_trial_runtime_seconds
+        ):
+            history["status"] = "time_capped"
             break
 
     model.load_state_dict(best_state)
@@ -547,8 +579,10 @@ def run_pcn_hyperparameter_search(
                 "evals": int(history.get("evals_ran", 0)),
             }
             rows.append(row)
+            if run_dir is not None:
+                _save_progress_summary(run_dir, rows)
 
-            if status in {"completed", "early_stopped"} and row["val_mae"] < best_val_mae:
+            if status in {"completed", "early_stopped", "time_capped"} and row["val_mae"] < best_val_mae:
                 best_val_mae = float(row["val_mae"])
                 best_row = row
                 best_history = history
@@ -644,6 +678,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--benchmark", type=str, default=None)
     parser.add_argument("--device", type=str, default=None)
+    parser.add_argument("--max-trial-runtime-seconds", type=float, default=None)
+    parser.add_argument("--no-trial-runtime-cap", action="store_true")
     args = parser.parse_args(argv)
 
     config = SCRIPT_CONFIG
@@ -651,6 +687,10 @@ def main(argv: list[str] | None = None) -> int:
         config = replace(config, benchmarks=(_canonical_benchmark_name(args.benchmark),))
     if args.device is not None:
         config = replace(config, device=args.device)
+    if args.no_trial_runtime_cap:
+        config = replace(config, max_trial_runtime_seconds=None)
+    elif args.max_trial_runtime_seconds is not None:
+        config = replace(config, max_trial_runtime_seconds=args.max_trial_runtime_seconds)
 
     _validate_requested_device(config.device)
 
