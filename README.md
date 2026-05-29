@@ -38,12 +38,62 @@ Durch den Einsatz von PC wird die globale Fehlerfortpflanzung durch lokale Fehle
    2. Parallelisierungspotenzial: Lokale Rechenoperationen ermöglichen effizientere Hardware-Implementierungen.
    3. Architektur: Mit einer 1-5-5-5-1 Struktur bleibt das Netzwerk flach genug, um die bekannten Konvergenzprobleme von PC in tiefen Architekturen zu vermeiden.
 
+## Praktische Trainingsstrategie
+
+Das Projekt behandelt PC und QVNN nicht nur als mathematische Kombination, sondern als Rechenproblem. Predictive Coding ersetzt einen einzelnen Backpropagation-Schritt durch eine innere Inferenzschleife über latente Zustände. Quaternionwertige Schichten erhöhen zusätzlich die Kosten jeder linearen Operation, weil ein Hamilton-Produkt vier gekoppelte Real-Komponenten verarbeitet. Die zentrale Frage ist deshalb nicht nur, ob das Verfahren konvergiert, sondern ob es mit vertretbarer Trainingszeit skaliert.
+
+Für die PCN-Experimente werden die Zielwerte auf Basis der Trainingsmenge normalisiert. Die Benchmark-Funktionen haben sehr unterschiedliche Skalen, insbesondere Schwefel. Ohne Zielnormalisierung dominiert die Zielskala die latente Inferenz und die Readout-Gewichte können instabil werden. Trainiert wird daher intern auf standardisierten Skalarzielen; die Zusammenfassungen und Testmetriken werden auf der ursprünglichen Zielskala berichtet.
+
+Die latente Inferenz verwendet eine feste maximale Schrittzahl, kann aber adaptiv früher abbrechen, wenn die mittlere Norm der latenten Gradienten klein genug ist. Das folgt der PC-Idee, dass einfache Beispiele weniger Inferenz benötigen als schwierige Beispiele. Dadurch sinkt die Trainingszeit, ohne die maximale Inferenzkapazität für harte Batches zu entfernen.
+
+Im GPU-Betrieb werden teure Finite-Checks nicht in jedem Inferenzschritt erzwungen. Diese Checks sind hilfreich zur Diagnose, synchronisieren aber CPU und GPU und verlangsamen lange H200-Läufe. Für Debugging können sie wieder aktiviert werden; für Produktionsläufe ist die stabilere Kombination aus Zielnormalisierung, kleinen Lernraten und adaptiver Inferenz sinnvoller.
+
+## Hybride PC/QVNN-Architektur
+
+Das erste skalierbare Hybridmodell ist ein split-quaternion Predictive Coding Network. Es verwendet quaternionwertige Zustände, Gewichte, lokale Fehler und Hamilton-Produkte, aber komponentenweise Split-Aktivierungen. Dieser Ansatz ist bewusst pragmatisch: Er erhält die Kopplung der vier Quaternion-Komponenten, vermeidet aber die deutlich teureren GHR-Ableitungsterme in jeder latenten Inferenziteration.
+
+Die GHR-Variante bleibt als mathematisch reichere Forschungsrichtung interessant, sollte aber erst nach einer stabilen split-quaternion PCN-Basis verfolgt werden. In einer PCN-Schleife würden GHR-Terme nicht nur einmal pro Backward-Pass, sondern wiederholt pro Inferenzschritt anfallen. Das macht GHR-PCN zum Genauigkeits-/Fidelity-Experiment, nicht zum ersten skalierbaren Default.
+
+Quaternion-Matrixmultiplikation wird für den üblichen Layer-Fall über gekoppelte Real-GEMMs formuliert. Das vermeidet grosse temporäre Tensoren der Form `(batch, out, in, 4)` und nutzt die optimierten Matrixmultiplikationen von PyTorch besser aus. Für kleine Forschungsmodelle ist der Unterschied moderat; für breitere PC/QVNN-Varianten wird dieser Punkt wichtig.
+
 ### Baseline & Evaluation
 Als primäre Baseline dient das CMLP (Clifford Multilayer Perceptron)-Verfahren, das in der Vergleichsstudie von Bill et al. die besten Resultate lieferte. Evaluiert wird die Performance bei der Approximation nichtlinearer Funktionen hinsichtlich:
 
 * Approximationsgenauigkeit (MSE)
 * Konvergenzgeschwindigkeit
 * Recheneffizienz
+
+## Experimente auf dem H200
+
+Die PCN-Benchmarks sind für H200-Läufe so ausgelegt, dass Daten einmal auf das Zielgerät verschoben werden, die Trainingsziele normalisiert sind und die Validierung nicht in jedem Epochenschritt eine volle teure Inferenz erzwingt. Für einen vollständigen PCN-Benchmark über die vier Funktionen:
+
+```bash
+sbatch cluster/run_pcn_benchmark.slurm
+```
+
+Für die Hyperparametersuche:
+
+```bash
+sbatch cluster/run_pcn_hyperparameter_search.slurm
+```
+
+Für das split-quaternion Predictive Coding Network alleine:
+
+```bash
+sbatch cluster/run_cpcn_benchmark.slurm
+```
+
+Dieser CPCN-Lauf ist der direkte Test der CMLP-inspirierten PC/QVNN-Idee: Die Daten bleiben quaternionwertig, die Zielwerte werden für die PC-Inferenz stabilisiert, und die Auswertung wird wieder auf der ursprünglichen Skala berichtet.
+
+Die wichtigsten PCN-Parameter sind:
+
+* `T_infer_train`: maximale Anzahl latenter Inferenzschritte während des Trainings.
+* `T_infer_eval`: maximale Anzahl latenter Inferenzschritte während der Auswertung.
+* `eta_infer`: Schrittweite der latenten Zustandsinferenz.
+* `eta_learn`: Schrittweite der Gewichtsaktualisierung.
+* `batch_size`: bestimmt den Kompromiss zwischen verrauschten lokalen Updates und GPU-Auslastung.
+* `adaptive_inference`: erlaubt frühen Abbruch der Inferenz, wenn die latenten Gradienten klein genug sind.
+* `normalize_targets`: stabilisiert Funktionen mit stark unterschiedlichen Zielskalen und sollte für PCN-Läufe aktiviert bleiben.
 
 ## References
 

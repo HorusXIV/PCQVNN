@@ -38,8 +38,13 @@ class QuaternionRegressionDataSplit:
     y_train_scalar: torch.Tensor
     y_val_scalar: torch.Tensor
     y_test_scalar: torch.Tensor
+    y_train_scalar_normalized: torch.Tensor
+    y_val_scalar_normalized: torch.Tensor
+    y_test_scalar_normalized: torch.Tensor
     x_mean: torch.Tensor
     x_std: torch.Tensor
+    y_mean: torch.Tensor
+    y_std: torch.Tensor
 
 
 def _resolve_benchmark(name: str) -> tuple[str, tuple[float, float]]:
@@ -122,6 +127,11 @@ def make_benchmark_regression_split(
 
     x_mean = raw_x_train.mean(dim=0)
     x_std = raw_x_train.std(dim=0, unbiased=False).clamp_min(eps)
+    y_mean = y_train_scalar.mean()
+    y_std = y_train_scalar.std(unbiased=False).clamp_min(eps)
+    y_train_scalar_normalized = (y_train_scalar - y_mean) / y_std
+    y_val_scalar_normalized = (y_val_scalar - y_mean) / y_std
+    y_test_scalar_normalized = (y_test_scalar - y_mean) / y_std
 
     x_train = _quaternionize_inputs((raw_x_train - x_mean) / x_std)
     x_val = _quaternionize_inputs((raw_x_val - x_mean) / x_std)
@@ -150,6 +160,11 @@ def make_benchmark_regression_split(
         y_train_scalar=_move(y_train_scalar),
         y_val_scalar=_move(y_val_scalar),
         y_test_scalar=_move(y_test_scalar),
+        y_train_scalar_normalized=_move(y_train_scalar_normalized),
+        y_val_scalar_normalized=_move(y_val_scalar_normalized),
+        y_test_scalar_normalized=_move(y_test_scalar_normalized),
         x_mean=_move(x_mean),
         x_std=_move(x_std),
+        y_mean=_move(y_mean),
+        y_std=_move(y_std),
     )

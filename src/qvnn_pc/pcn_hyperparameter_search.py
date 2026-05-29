@@ -25,8 +25,10 @@ from qvnn_pc.models.shared import OptimizerName
 from qvnn_pc.pcn_benchmark import (
     DEFAULT_RESULTS_ROOT,
     PredictiveCodingBenchmarkConfig,
+    RealRegressionSplit,
     _canonical_benchmark_name,
     _plot_history,
+    _raw_scale_metrics,
     _standardized_real_split,
     _validate_requested_device,
 )
@@ -46,6 +48,11 @@ class PredictiveCodingSearchConfig:
     batch_sizes: tuple[int, ...] = (1, 32, 512)
     latent_init: LatentInitName = "feedforward"
     probe_size: int = 128
+    normalize_targets: bool = True
+    adaptive_inference: bool = True
+    inference_tolerance: float = 1e-3
+    min_inference_steps: int = 4
+    check_finite: bool = False
     device: torch.device | str | None = "cuda" if torch.cuda.is_available() else "cpu"
     dtype: torch.dtype = torch.float32
     eta_log10_min: float = -5.0
@@ -102,6 +109,11 @@ def _save_run_metadata(run_dir: Path, config: PredictiveCodingSearchConfig, *, s
         "batch_sizes": list(config.batch_sizes),
         "latent_init": config.latent_init,
         "probe_size": config.probe_size,
+        "normalize_targets": config.normalize_targets,
+        "adaptive_inference": config.adaptive_inference,
+        "inference_tolerance": config.inference_tolerance,
+        "min_inference_steps": config.min_inference_steps,
+        "check_finite": config.check_finite,
         "device": None if config.device is None else str(config.device),
         "dtype": str(config.dtype),
         "eta_log10_range": [config.eta_log10_min, config.eta_log10_max],
@@ -243,13 +255,10 @@ def _save_progress_summary(run_dir: Path, rows: list[dict[str, float | int | str
 
 
 def _move_real_split_to_device(
-    real_split: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+    real_split: RealRegressionSplit,
     device: torch.device | str | None,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    if device is None:
-        return real_split
-    target_device = torch.device(device)
-    return tuple(tensor.to(target_device) for tensor in real_split)  # type: ignore[return-value]
+) -> RealRegressionSplit:
+    return real_split.to(device)
 
 
 def _screening_subset(x: torch.Tensor, y: torch.Tensor, max_size: int) -> tuple[torch.Tensor, torch.Tensor]:
@@ -333,6 +342,7 @@ def _fit_model_for_search(
         try:
             for batch_start in range(0, x_train.shape[0], benchmark_config.batch_size):
                 batch_indices = permutation[batch_start:batch_start + benchmark_config.batch_size]
+                batch_indices = batch_indices.to(x_train.device)
                 model.train_batch(
                     x_train[batch_indices],
                     y_train[batch_indices],
@@ -341,6 +351,10 @@ def _fit_model_for_search(
                     T_infer=benchmark_config.T_infer_train,
                     T_learn=benchmark_config.T_learn,
                     latent_init=benchmark_config.latent_init,
+                    adaptive=benchmark_config.adaptive_inference,
+                    tolerance=benchmark_config.inference_tolerance,
+                    min_steps=benchmark_config.min_inference_steps,
+                    check_finite=benchmark_config.check_finite,
                 )
         except FloatingPointError:
             history["status"] = "non_finite"
@@ -367,6 +381,9 @@ def _fit_model_for_search(
                 infer_steps=benchmark_config.T_infer_eval,
                 eta_infer=benchmark_config.eta_infer,
                 latent_init=benchmark_config.latent_init,
+                adaptive=benchmark_config.adaptive_inference,
+                tolerance=benchmark_config.inference_tolerance,
+                min_steps=benchmark_config.min_inference_steps,
             )
             val_metrics = model.evaluate(
                 val_eval_x,
@@ -374,6 +391,9 @@ def _fit_model_for_search(
                 infer_steps=benchmark_config.T_infer_eval,
                 eta_infer=benchmark_config.eta_infer,
                 latent_init=benchmark_config.latent_init,
+                adaptive=benchmark_config.adaptive_inference,
+                tolerance=benchmark_config.inference_tolerance,
+                min_steps=benchmark_config.min_inference_steps,
             )
         except FloatingPointError:
             history["status"] = "non_finite"
@@ -472,10 +492,13 @@ def run_pcn_hyperparameter_search(
             device=None,
             dtype=config.dtype,
         )
-        x_train, y_train, x_val, y_val, x_test, y_test = _move_real_split_to_device(
-            _standardized_real_split(split),
+        real_split = _move_real_split_to_device(
+            _standardized_real_split(split, normalize_targets=config.normalize_targets),
             config.device,
         )
+        x_train, y_train = real_split.x_train, real_split.y_train
+        x_val, y_val = real_split.x_val, real_split.y_val
+        x_test, y_test = real_split.x_test, real_split.y_test
         trial_specs = _sample_trial_grid(config, benchmark_idx=benchmark_idx)
 
         best_val_mae = float("inf")
@@ -505,6 +528,11 @@ def run_pcn_hyperparameter_search(
                 T_learn=int(trial_spec["T_learn"]),
                 latent_init=config.latent_init,
                 probe_size=config.probe_size,
+                normalize_targets=config.normalize_targets,
+                adaptive_inference=config.adaptive_inference,
+                inference_tolerance=config.inference_tolerance,
+                min_inference_steps=config.min_inference_steps,
+                check_finite=config.check_finite,
                 early_stopping=config.early_stopping,
                 device=config.device,
                 dtype=config.dtype,
@@ -517,6 +545,10 @@ def run_pcn_hyperparameter_search(
                 optimizer=benchmark_config.optimizer,
                 prediction_inference_steps=benchmark_config.T_infer_eval,
                 prediction_eta_infer=benchmark_config.eta_infer,
+                adaptive_inference=benchmark_config.adaptive_inference,
+                inference_tolerance=benchmark_config.inference_tolerance,
+                min_inference_steps=benchmark_config.min_inference_steps,
+                check_finite=benchmark_config.check_finite,
                 device=config.device,
                 dtype=config.dtype,
             )
@@ -599,6 +631,10 @@ def run_pcn_hyperparameter_search(
             optimizer=best_row["optimizer"],  # type: ignore[arg-type]
             prediction_inference_steps=int(best_row["T_infer_eval"]),
             prediction_eta_infer=float(best_row["eta_infer"]),
+            adaptive_inference=config.adaptive_inference,
+            inference_tolerance=config.inference_tolerance,
+            min_inference_steps=config.min_inference_steps,
+            check_finite=config.check_finite,
             device=config.device,
             dtype=config.dtype,
         )
@@ -609,6 +645,9 @@ def run_pcn_hyperparameter_search(
             infer_steps=int(best_row["T_infer_eval"]),
             eta_infer=float(best_row["eta_infer"]),
             latent_init=config.latent_init,
+            adaptive=config.adaptive_inference,
+            tolerance=config.inference_tolerance,
+            min_steps=config.min_inference_steps,
         )
         full_val_metrics = best_model.evaluate(
             x_val,
@@ -616,6 +655,9 @@ def run_pcn_hyperparameter_search(
             infer_steps=int(best_row["T_infer_eval"]),
             eta_infer=float(best_row["eta_infer"]),
             latent_init=config.latent_init,
+            adaptive=config.adaptive_inference,
+            tolerance=config.inference_tolerance,
+            min_steps=config.min_inference_steps,
         )
         full_test_metrics = best_model.evaluate(
             x_test,
@@ -623,22 +665,63 @@ def run_pcn_hyperparameter_search(
             infer_steps=int(best_row["T_infer_eval"]),
             eta_infer=float(best_row["eta_infer"]),
             latent_init=config.latent_init,
+            adaptive=config.adaptive_inference,
+            tolerance=config.inference_tolerance,
+            min_steps=config.min_inference_steps,
+        )
+        best_eval_config = replace(
+            PredictiveCodingBenchmarkConfig(),
+            T_infer_eval=int(best_row["T_infer_eval"]),
+            eta_infer=float(best_row["eta_infer"]),
+            latent_init=config.latent_init,
+            normalize_targets=config.normalize_targets,
+            adaptive_inference=config.adaptive_inference,
+            inference_tolerance=config.inference_tolerance,
+            min_inference_steps=config.min_inference_steps,
+            check_finite=config.check_finite,
+        )
+        full_train_raw_metrics = _raw_scale_metrics(
+            best_model,
+            real_split.x_train,
+            real_split.y_train_raw,
+            split=real_split,
+            config=best_eval_config,
+        )
+        full_val_raw_metrics = _raw_scale_metrics(
+            best_model,
+            real_split.x_val,
+            real_split.y_val_raw,
+            split=real_split,
+            config=best_eval_config,
+        )
+        full_test_raw_metrics = _raw_scale_metrics(
+            best_model,
+            real_split.x_test,
+            real_split.y_test_raw,
+            split=real_split,
+            config=best_eval_config,
         )
         best_evaluation = {
             "train": full_train_metrics,
             "val": full_val_metrics,
             "test": full_test_metrics,
+            "train_raw_scale": full_train_raw_metrics,
+            "val_raw_scale": full_val_raw_metrics,
+            "test_raw_scale": full_test_raw_metrics,
         }
         best_row.update(
             {
-                "train_mae": float(full_train_metrics["mae"]),
-                "val_mae": float(full_val_metrics["mae"]),
-                "test_mae": float(full_test_metrics["mae"]),
-                "train_mse": float(full_train_metrics["mse"]),
-                "val_mse": float(full_val_metrics["mse"]),
-                "test_mse": float(full_test_metrics["mse"]),
-                "val_r2": float(full_val_metrics["r2"]),
-                "test_r2": float(full_test_metrics["r2"]),
+                "train_mae": float(full_train_raw_metrics["mae"]),
+                "val_mae": float(full_val_raw_metrics["mae"]),
+                "test_mae": float(full_test_raw_metrics["mae"]),
+                "train_mse": float(full_train_raw_metrics["mse"]),
+                "val_mse": float(full_val_raw_metrics["mse"]),
+                "test_mse": float(full_test_raw_metrics["mse"]),
+                "val_r2": float(full_val_raw_metrics["r2"]),
+                "test_r2": float(full_test_raw_metrics["r2"]),
+                "train_normalized_mae": float(full_train_metrics["mae"]),
+                "val_normalized_mae": float(full_val_metrics["mae"]),
+                "test_normalized_mae": float(full_test_metrics["mae"]),
                 "full_evaluation": 1,
             }
         )

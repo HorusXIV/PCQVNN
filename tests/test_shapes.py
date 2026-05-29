@@ -20,6 +20,35 @@ def test_q_matmul_supports_batched_inputs():
     assert y.shape == (5, 3, 4)
 
 
+def test_q_matmul_matches_broadcast_hamilton_definition():
+    W = torch.randn(3, 2, 4)
+    x = torch.randn(5, 2, 4)
+    y = q_matmul(W, x)
+    expected = torch.stack(
+        (
+            W[..., 0] * x.unsqueeze(1)[..., 0]
+            - W[..., 1] * x.unsqueeze(1)[..., 1]
+            - W[..., 2] * x.unsqueeze(1)[..., 2]
+            - W[..., 3] * x.unsqueeze(1)[..., 3],
+            W[..., 0] * x.unsqueeze(1)[..., 1]
+            + W[..., 1] * x.unsqueeze(1)[..., 0]
+            + W[..., 2] * x.unsqueeze(1)[..., 3]
+            - W[..., 3] * x.unsqueeze(1)[..., 2],
+            W[..., 0] * x.unsqueeze(1)[..., 2]
+            - W[..., 1] * x.unsqueeze(1)[..., 3]
+            + W[..., 2] * x.unsqueeze(1)[..., 0]
+            + W[..., 3] * x.unsqueeze(1)[..., 1],
+            W[..., 0] * x.unsqueeze(1)[..., 3]
+            + W[..., 1] * x.unsqueeze(1)[..., 2]
+            - W[..., 2] * x.unsqueeze(1)[..., 1]
+            + W[..., 3] * x.unsqueeze(1)[..., 0],
+        ),
+        dim=-1,
+    ).sum(dim=-2)
+
+    torch.testing.assert_close(y, expected)
+
+
 def test_split_activations_preserve_shape():
     q = torch.randn(7, 4)
     assert split_tanh(q).shape == q.shape

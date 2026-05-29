@@ -36,6 +36,24 @@ def test_targets_are_quaternion_encoded_with_zero_imaginary_components():
         torch.testing.assert_close(target[..., 1:], torch.zeros_like(target[..., 1:]))
 
 
+def test_scalar_targets_expose_train_only_normalized_view():
+    split = make_benchmark_regression_split("ackley", n=30_000, sample_seed=13, split_seed=17)
+
+    torch.testing.assert_close(split.y_train_scalar_normalized.mean(), torch.tensor(0.0), atol=1e-5, rtol=1e-5)
+    torch.testing.assert_close(
+        split.y_train_scalar_normalized.std(unbiased=False),
+        torch.tensor(1.0),
+        atol=1e-5,
+        rtol=1e-5,
+    )
+    torch.testing.assert_close(
+        split.y_train_scalar_normalized * split.y_std + split.y_mean,
+        split.y_train_scalar,
+        atol=1e-5,
+        rtol=1e-5,
+    )
+
+
 def test_ackley_source_style_bounds_use_minus_30_to_30():
     split = make_benchmark_regression_split("ackley", n=30_000, sample_seed=29, split_seed=31)
 

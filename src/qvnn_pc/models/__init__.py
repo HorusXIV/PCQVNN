@@ -10,6 +10,7 @@ from .shared import (
 )
 from .cmlp import CMLPQuaternionMLP
 from .classical_mlp import ClassicalMLP
+from .cpcn import QuaternionPCNLayer, SplitQuaternionPredictiveCodingNetwork
 from .ghr import (
     GHRQuaternionMLP,
 )
@@ -23,6 +24,8 @@ __all__ = [
     "CMLPQuaternionMLP",
     "ClassicalMLP",
     "GHRQuaternionMLP",
+    "QuaternionPCNLayer",
+    "SplitQuaternionPredictiveCodingNetwork",
     "OptimizerName",
     "quaternion_adagrad_step_",
     "quaternion_adadelta_step_",

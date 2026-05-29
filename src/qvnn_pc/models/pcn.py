@@ -130,6 +130,10 @@ class PredictiveCodingNetwork(nn.Module):
         prediction_eta_infer: float = 0.05,
         optimizer_eps: float = 1e-9,
         adadelta_rho: float = 0.9,
+        adaptive_inference: bool = False,
+        inference_tolerance: float = 1e-4,
+        min_inference_steps: int = 4,
+        check_finite: bool = True,
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
@@ -150,6 +154,10 @@ class PredictiveCodingNetwork(nn.Module):
         self.prediction_eta_infer = float(prediction_eta_infer)
         self.optimizer_eps = float(optimizer_eps)
         self.adadelta_rho = float(adadelta_rho)
+        self.adaptive_inference = bool(adaptive_inference)
+        self.inference_tolerance = float(inference_tolerance)
+        self.min_inference_steps = int(min_inference_steps)
+        self.check_finite = bool(check_finite)
         activation_fn, activation_deriv = _activation_pair(activation)
 
         self.layers = nn.ModuleList([
@@ -330,16 +338,28 @@ class PredictiveCodingNetwork(nn.Module):
         steps: int | None = None,
         eta_infer: float | None = None,
         latent_init: LatentInitName = "feedforward",
+        adaptive: bool | None = None,
+        tolerance: float | None = None,
+        min_steps: int | None = None,
+        check_finite: bool | None = None,
         return_trace: bool = False,
     ) -> dict[str, list[torch.Tensor] | torch.Tensor | dict[str, list[float]]]:
         x_real = self._prepare_input(x)
         y_real = None if y is None else self._prepare_target(y)
         infer_steps = self.prediction_inference_steps if steps is None else int(steps)
         infer_eta = self.prediction_eta_infer if eta_infer is None else float(eta_infer)
+        use_adaptive = self.adaptive_inference if adaptive is None else bool(adaptive)
+        infer_tolerance = self.inference_tolerance if tolerance is None else float(tolerance)
+        infer_min_steps = self.min_inference_steps if min_steps is None else int(min_steps)
+        do_finite_checks = self.check_finite if check_finite is None else bool(check_finite)
         if infer_steps < 0:
             raise ValueError(f"Expected steps >= 0, got {infer_steps}.")
         if infer_eta <= 0.0:
             raise ValueError(f"Expected eta_infer > 0, got {infer_eta}.")
+        if infer_tolerance <= 0.0:
+            raise ValueError(f"Expected inference tolerance > 0, got {infer_tolerance}.")
+        if infer_min_steps < 0:
+            raise ValueError(f"Expected min_steps >= 0, got {infer_min_steps}.")
 
         states = [x_real] + self.init_latents(
             x_real.shape[0],
@@ -370,17 +390,25 @@ class PredictiveCodingNetwork(nn.Module):
             prediction = self._readout(states[-1])
             _record_trace(gradients)
         else:
-            for _ in range(infer_steps):
+            for step_idx in range(infer_steps):
                 gradients, prediction = self._latent_gradients(states, target=y_real)
-                if not _all_finite(tuple(gradients) + (prediction,)):
+                if do_finite_checks and not _all_finite(tuple(gradients) + (prediction,)):
                     raise FloatingPointError("PCN latent inference became non-finite.")
                 _record_trace(gradients)
+                if use_adaptive:
+                    mean_grad_norm = torch.stack([gradient.norm(dim=1).mean() for gradient in gradients]).mean()
+                    if return_trace:
+                        grad_value = trace["mean_latent_grad_norm"][-1]
+                    else:
+                        grad_value = float(mean_grad_norm.detach().cpu())
+                    if step_idx + 1 >= infer_min_steps and grad_value <= infer_tolerance:
+                        break
                 for latent_idx, gradient in enumerate(gradients, start=1):
                     states[latent_idx].sub_(gradient, alpha=infer_eta)
-                if not _all_finite(tuple(states[1:])):
+                if do_finite_checks and not _all_finite(tuple(states[1:])):
                     raise FloatingPointError("PCN latent states became non-finite during inference.")
             gradients, prediction = self._latent_gradients(states, target=y_real)
-            if not _all_finite(tuple(gradients) + (prediction,)):
+            if do_finite_checks and not _all_finite(tuple(gradients) + (prediction,)):
                 raise FloatingPointError("PCN final latent inference state became non-finite.")
             _record_trace(gradients)
 
@@ -403,6 +431,9 @@ class PredictiveCodingNetwork(nn.Module):
         infer_steps: int | None = None,
         eta_infer: float | None = None,
         latent_init: LatentInitName = "feedforward",
+        adaptive: bool | None = None,
+        tolerance: float | None = None,
+        min_steps: int | None = None,
         fast: bool = False,
         return_trace: bool = False,
     ) -> torch.Tensor | tuple[torch.Tensor, dict[str, list[float]]]:
@@ -423,6 +454,9 @@ class PredictiveCodingNetwork(nn.Module):
             steps=infer_steps,
             eta_infer=eta_infer,
             latent_init=latent_init,
+            adaptive=adaptive,
+            tolerance=tolerance,
+            min_steps=min_steps,
             return_trace=return_trace,
         )
         prediction = cast(torch.Tensor, result["prediction"])
@@ -438,6 +472,9 @@ class PredictiveCodingNetwork(nn.Module):
         infer_steps: int | None = None,
         eta_infer: float | None = None,
         latent_init: LatentInitName = "feedforward",
+        adaptive: bool | None = None,
+        tolerance: float | None = None,
+        min_steps: int | None = None,
         fast: bool = False,
     ) -> torch.Tensor:
         return cast(
@@ -447,6 +484,9 @@ class PredictiveCodingNetwork(nn.Module):
                 infer_steps=infer_steps,
                 eta_infer=eta_infer,
                 latent_init=latent_init,
+                adaptive=adaptive,
+                tolerance=tolerance,
+                min_steps=min_steps,
                 fast=fast,
             ),
         )
@@ -462,6 +502,10 @@ class PredictiveCodingNetwork(nn.Module):
         T_infer: int,
         T_learn: int,
         latent_init: LatentInitName = "feedforward",
+        adaptive: bool | None = None,
+        tolerance: float | None = None,
+        min_steps: int | None = None,
+        check_finite: bool | None = None,
         record_trace: bool = False,
     ) -> dict[str, float | dict[str, list[float]]]:
         if T_infer < 0:
@@ -477,6 +521,10 @@ class PredictiveCodingNetwork(nn.Module):
             steps=T_infer,
             eta_infer=eta_infer,
             latent_init=latent_init,
+            adaptive=adaptive,
+            tolerance=tolerance,
+            min_steps=min_steps,
+            check_finite=check_finite,
             return_trace=record_trace,
         )
         states = cast(list[torch.Tensor], inference_result["states"])
@@ -524,12 +572,14 @@ class PredictiveCodingNetwork(nn.Module):
             )
             params = [param for layer in self.layers for param in (layer.W, layer.bias)]
             params.extend([self.readout_weight, self.readout_bias])
-            if not _all_finite(tuple(params)):
+            do_finite_checks = self.check_finite if check_finite is None else bool(check_finite)
+            if do_finite_checks and not _all_finite(tuple(params)):
                 raise FloatingPointError("PCN weights became non-finite during learning.")
 
         prediction_states = [x_real, *self.feedforward_latents(x_real)]
         energy_metrics, y_hat = self._compute_energy(prediction_states, target=y_real)
-        if not _all_finite((y_hat,)):
+        do_finite_checks = self.check_finite if check_finite is None else bool(check_finite)
+        if do_finite_checks and not _all_finite((y_hat,)):
             raise FloatingPointError("PCN prediction became non-finite after learning.")
 
         metrics: dict[str, float | dict[str, list[float]]] = {
@@ -551,6 +601,9 @@ class PredictiveCodingNetwork(nn.Module):
         infer_steps: int | None = None,
         eta_infer: float | None = None,
         latent_init: LatentInitName = "feedforward",
+        adaptive: bool | None = None,
+        tolerance: float | None = None,
+        min_steps: int | None = None,
         fast: bool = False,
         return_trace: bool = False,
     ) -> dict[str, float | dict[str, list[float]]]:
@@ -573,6 +626,9 @@ class PredictiveCodingNetwork(nn.Module):
                 steps=infer_steps,
                 eta_infer=eta_infer,
                 latent_init=latent_init,
+                adaptive=adaptive,
+                tolerance=tolerance,
+                min_steps=min_steps,
                 return_trace=return_trace,
             )
             states = cast(list[torch.Tensor], result["states"])
@@ -605,6 +661,10 @@ class PredictiveCodingNetwork(nn.Module):
         T_learn: int = 1,
         eval_infer_steps: int | None = None,
         latent_init: LatentInitName = "feedforward",
+        adaptive: bool | None = None,
+        tolerance: float | None = None,
+        min_steps: int | None = None,
+        check_finite: bool | None = None,
     ) -> dict[str, list[float] | float | int]:
         if epochs <= 0:
             raise ValueError(f"Expected epochs > 0, got {epochs}.")
@@ -645,6 +705,10 @@ class PredictiveCodingNetwork(nn.Module):
                         T_infer=T_infer,
                         T_learn=T_learn,
                         latent_init=latent_init,
+                        adaptive=adaptive,
+                        tolerance=tolerance,
+                        min_steps=min_steps,
+                        check_finite=check_finite,
                     )
 
                 train_metrics = self.evaluate(
@@ -653,6 +717,9 @@ class PredictiveCodingNetwork(nn.Module):
                     infer_steps=eval_steps,
                     eta_infer=eta_infer,
                     latent_init=latent_init,
+                    adaptive=adaptive,
+                    tolerance=tolerance,
+                    min_steps=min_steps,
                 )
             except FloatingPointError:
                 history["status"] = "non_finite"
@@ -668,6 +735,9 @@ class PredictiveCodingNetwork(nn.Module):
                         infer_steps=eval_steps,
                         eta_infer=eta_infer,
                         latent_init=latent_init,
+                        adaptive=adaptive,
+                        tolerance=tolerance,
+                        min_steps=min_steps,
                     )
                 except FloatingPointError:
                     history["status"] = "non_finite"

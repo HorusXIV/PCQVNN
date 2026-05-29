@@ -22,7 +22,7 @@ import torch
 from qvnn_pc.config import default_hyperparameters_path
 from qvnn_pc.data import BENCHMARK_FUNCTIONS, make_benchmark_regression_split
 from qvnn_pc.models import PredictiveCodingNetwork
-from qvnn_pc.models.pcn import ActivationName, LatentInitName
+from qvnn_pc.models.pcn import ActivationName, LatentInitName, scalar_regression_metrics as real_scalar_regression_metrics
 from qvnn_pc.models.shared import OptimizerName
 from qvnn_pc.models.shared import pq_alpha_should_stop as _pq_alpha_should_stop
 
@@ -52,12 +52,51 @@ class PredictiveCodingBenchmarkConfig:
     T_learn: int = 1
     latent_init: LatentInitName = "feedforward"
     probe_size: int = 128
+    normalize_targets: bool = True
+    adaptive_inference: bool = True
+    inference_tolerance: float = 1e-3
+    min_inference_steps: int = 4
+    check_finite: bool = False
+    evaluation_interval: int = 5
     early_stopping: bool = False
     device: torch.device | str | None = "cuda" if torch.cuda.is_available() else "cpu"
     dtype: torch.dtype = torch.float32
 
 
 SCRIPT_CONFIG = PredictiveCodingBenchmarkConfig()
+
+
+@dataclass(frozen=True)
+class RealRegressionSplit:
+    x_train: torch.Tensor
+    y_train: torch.Tensor
+    x_val: torch.Tensor
+    y_val: torch.Tensor
+    x_test: torch.Tensor
+    y_test: torch.Tensor
+    y_train_raw: torch.Tensor
+    y_val_raw: torch.Tensor
+    y_test_raw: torch.Tensor
+    y_mean: torch.Tensor
+    y_std: torch.Tensor
+
+    def to(self, device: torch.device | str | None) -> "RealRegressionSplit":
+        if device is None:
+            return self
+        target_device = torch.device(device)
+        return RealRegressionSplit(
+            x_train=self.x_train.to(target_device),
+            y_train=self.y_train.to(target_device),
+            x_val=self.x_val.to(target_device),
+            y_val=self.y_val.to(target_device),
+            x_test=self.x_test.to(target_device),
+            y_test=self.y_test.to(target_device),
+            y_train_raw=self.y_train_raw.to(target_device),
+            y_val_raw=self.y_val_raw.to(target_device),
+            y_test_raw=self.y_test_raw.to(target_device),
+            y_mean=self.y_mean.to(target_device),
+            y_std=self.y_std.to(target_device),
+        )
 
 
 def _canonical_benchmark_name(name: str) -> str:
@@ -126,6 +165,12 @@ def _save_run_metadata(
         "T_learn": config.T_learn,
         "latent_init": config.latent_init,
         "probe_size": config.probe_size,
+        "normalize_targets": config.normalize_targets,
+        "adaptive_inference": config.adaptive_inference,
+        "inference_tolerance": config.inference_tolerance,
+        "min_inference_steps": config.min_inference_steps,
+        "check_finite": config.check_finite,
+        "evaluation_interval": config.evaluation_interval,
         "early_stopping": config.early_stopping,
         "summary_path": str(summary_path),
         "device": None if config.device is None else str(config.device),
@@ -138,15 +183,79 @@ def _save_run_metadata(
         shutil.copy2(DEFAULT_HYPERPARAMETERS_PATH, run_dir / "hyperparameters.yml")
 
 
-def _standardized_real_split(split):
-    return (
+def _standardized_real_split(split, *, normalize_targets: bool = True) -> RealRegressionSplit:
+    if normalize_targets:
+        y_train = split.y_train_scalar_normalized.unsqueeze(-1)
+        y_val = split.y_val_scalar_normalized.unsqueeze(-1)
+        y_test = split.y_test_scalar_normalized.unsqueeze(-1)
+    else:
+        y_train = split.y_train_scalar.unsqueeze(-1)
+        y_val = split.y_val_scalar.unsqueeze(-1)
+        y_test = split.y_test_scalar.unsqueeze(-1)
+
+    return RealRegressionSplit(
         split.x_train[:, 0, :],
-        split.y_train_scalar.unsqueeze(-1),
+        y_train,
         split.x_val[:, 0, :],
-        split.y_val_scalar.unsqueeze(-1),
+        y_val,
         split.x_test[:, 0, :],
+        y_test,
+        split.y_train_scalar.unsqueeze(-1),
+        split.y_val_scalar.unsqueeze(-1),
         split.y_test_scalar.unsqueeze(-1),
+        split.y_mean.reshape(1, 1),
+        split.y_std.reshape(1, 1),
     )
+
+
+def _prediction_on_raw_scale(
+    model: PredictiveCodingNetwork,
+    x: torch.Tensor,
+    *,
+    split: RealRegressionSplit,
+    config: PredictiveCodingBenchmarkConfig,
+    return_trace: bool = False,
+) -> tuple[torch.Tensor, dict[str, list[float]] | None]:
+    prediction = model.predict(
+        x,
+        infer_steps=config.T_infer_eval,
+        eta_infer=config.eta_infer,
+        latent_init=config.latent_init,
+        adaptive=config.adaptive_inference,
+        tolerance=config.inference_tolerance,
+        min_steps=config.min_inference_steps,
+        return_trace=return_trace,
+    )
+    if return_trace:
+        normalized_prediction, trace = cast(tuple[torch.Tensor, dict[str, list[float]]], prediction)
+    else:
+        normalized_prediction = cast(torch.Tensor, prediction)
+        trace = None
+    if not config.normalize_targets:
+        return normalized_prediction, trace
+    return normalized_prediction * split.y_std + split.y_mean, trace
+
+
+def _raw_scale_metrics(
+    model: PredictiveCodingNetwork,
+    x: torch.Tensor,
+    y_raw: torch.Tensor,
+    *,
+    split: RealRegressionSplit,
+    config: PredictiveCodingBenchmarkConfig,
+    return_trace: bool = False,
+) -> dict[str, float | dict[str, list[float]]]:
+    raw_prediction, trace = _prediction_on_raw_scale(
+        model,
+        x,
+        split=split,
+        config=config,
+        return_trace=return_trace,
+    )
+    metrics: dict[str, float | dict[str, list[float]]] = real_scalar_regression_metrics(raw_prediction, y_raw)
+    if trace is not None:
+        metrics["inference_trace"] = trace
+    return metrics
 
 
 def _history_template() -> dict[str, list[float] | list[list[float]] | float | int]:
@@ -284,51 +393,66 @@ def _save_training_artifacts(
 def _fit_model(
     model: PredictiveCodingNetwork,
     *,
-    x_train: torch.Tensor,
-    y_train: torch.Tensor,
-    x_val: torch.Tensor,
-    y_val: torch.Tensor,
+    split: RealRegressionSplit,
     config: PredictiveCodingBenchmarkConfig,
     shuffle_generator: torch.Generator,
 ) -> dict[str, list[float] | list[list[float]] | float | int | str]:
     history = _history_template()
     best_state = {name: tensor.detach().cpu().clone() for name, tensor in model.state_dict().items()}
     best_validation_loss = float("inf")
-    probe_train_x = x_train[:config.probe_size]
-    probe_train_y = y_train[:config.probe_size]
-    probe_val_x = x_val[:config.probe_size]
-    probe_val_y = y_val[:config.probe_size]
+    probe_train_x = split.x_train[:config.probe_size]
+    probe_train_y = split.y_train[:config.probe_size]
+    probe_val_x = split.x_val[:config.probe_size]
+    probe_val_y = split.y_val[:config.probe_size]
+    eval_every = max(1, int(config.evaluation_interval))
+    epochs_ran = 0
 
     start = time.perf_counter()
     history["status"] = "completed"
-    for _ in range(config.epochs):
-        permutation = torch.randperm(x_train.shape[0], generator=shuffle_generator, device="cpu")
+    for epoch_idx in range(config.epochs):
+        epochs_ran = epoch_idx + 1
+        permutation = torch.randperm(split.x_train.shape[0], generator=shuffle_generator, device="cpu")
         try:
-            for batch_start in range(0, x_train.shape[0], config.batch_size):
+            for batch_start in range(0, split.x_train.shape[0], config.batch_size):
                 batch_indices = permutation[batch_start:batch_start + config.batch_size]
+                batch_indices = batch_indices.to(split.x_train.device)
                 model.train_batch(
-                    x_train[batch_indices],
-                    y_train[batch_indices],
+                    split.x_train[batch_indices],
+                    split.y_train[batch_indices],
                     eta_infer=config.eta_infer,
                     eta_learn=config.eta_learn,
                     T_infer=config.T_infer_train,
                     T_learn=config.T_learn,
                     latent_init=config.latent_init,
+                    adaptive=config.adaptive_inference,
+                    tolerance=config.inference_tolerance,
+                    min_steps=config.min_inference_steps,
+                    check_finite=config.check_finite,
                 )
 
+            should_evaluate = epoch_idx == 0 or epochs_ran == config.epochs or epochs_ran % eval_every == 0
+            if not should_evaluate:
+                continue
+
             train_metrics = model.evaluate(
-                x_train,
-                y_train,
+                split.x_train,
+                split.y_train,
                 infer_steps=config.T_infer_eval,
                 eta_infer=config.eta_infer,
                 latent_init=config.latent_init,
+                adaptive=config.adaptive_inference,
+                tolerance=config.inference_tolerance,
+                min_steps=config.min_inference_steps,
             )
             val_metrics = model.evaluate(
-                x_val,
-                y_val,
+                split.x_val,
+                split.y_val,
                 infer_steps=config.T_infer_eval,
                 eta_infer=config.eta_infer,
                 latent_init=config.latent_init,
+                adaptive=config.adaptive_inference,
+                tolerance=config.inference_tolerance,
+                min_steps=config.min_inference_steps,
             )
         except FloatingPointError:
             history["status"] = "non_finite"
@@ -351,6 +475,10 @@ def _fit_model(
                 steps=config.T_infer_eval,
                 eta_infer=config.eta_infer,
                 latent_init=config.latent_init,
+                adaptive=config.adaptive_inference,
+                tolerance=config.inference_tolerance,
+                min_steps=config.min_inference_steps,
+                check_finite=config.check_finite,
                 return_trace=True,
             )["trace"],
         )
@@ -362,6 +490,10 @@ def _fit_model(
                 steps=config.T_infer_eval,
                 eta_infer=config.eta_infer,
                 latent_init=config.latent_init,
+                adaptive=config.adaptive_inference,
+                tolerance=config.inference_tolerance,
+                min_steps=config.min_inference_steps,
+                check_finite=config.check_finite,
                 return_trace=True,
             )["trace"],
         )
@@ -387,7 +519,8 @@ def _fit_model(
     model.load_state_dict(best_state)
     history["runtime"] = time.perf_counter() - start
     history["best_validation_loss"] = best_validation_loss
-    history["epochs_ran"] = len(history["train_mae"])  # type: ignore[arg-type]
+    history["epochs_ran"] = epochs_ran
+    history["evals_ran"] = len(history["train_mae"])  # type: ignore[arg-type]
     return history
 
 
@@ -408,7 +541,7 @@ def run_pcn_benchmark(
             device=None,
             dtype=config.dtype,
         )
-        x_train, y_train, x_val, y_val, x_test, y_test = _standardized_real_split(split)
+        real_split = _standardized_real_split(split, normalize_targets=config.normalize_targets).to(config.device)
 
         for repetition in range(1, config.repetitions + 1):
             model = PredictiveCodingNetwork(
@@ -418,40 +551,72 @@ def run_pcn_benchmark(
                 optimizer=config.optimizer,
                 prediction_inference_steps=config.T_infer_eval,
                 prediction_eta_infer=config.eta_infer,
+                adaptive_inference=config.adaptive_inference,
+                inference_tolerance=config.inference_tolerance,
+                min_inference_steps=config.min_inference_steps,
+                check_finite=config.check_finite,
                 device=config.device,
                 dtype=config.dtype,
             )
             shuffle_generator = torch.Generator(device="cpu").manual_seed(int(repetition * 1e6))
             history = _fit_model(
                 model,
-                x_train=x_train,
-                y_train=y_train,
-                x_val=x_val,
-                y_val=y_val,
+                split=real_split,
                 config=config,
                 shuffle_generator=shuffle_generator,
             )
 
             train_metrics = model.evaluate(
-                x_train,
-                y_train,
+                real_split.x_train,
+                real_split.y_train,
                 infer_steps=config.T_infer_eval,
                 eta_infer=config.eta_infer,
                 latent_init=config.latent_init,
+                adaptive=config.adaptive_inference,
+                tolerance=config.inference_tolerance,
+                min_steps=config.min_inference_steps,
             )
             val_metrics = model.evaluate(
-                x_val,
-                y_val,
+                real_split.x_val,
+                real_split.y_val,
                 infer_steps=config.T_infer_eval,
                 eta_infer=config.eta_infer,
                 latent_init=config.latent_init,
+                adaptive=config.adaptive_inference,
+                tolerance=config.inference_tolerance,
+                min_steps=config.min_inference_steps,
             )
             test_metrics = model.evaluate(
-                x_test,
-                y_test,
+                real_split.x_test,
+                real_split.y_test,
                 infer_steps=config.T_infer_eval,
                 eta_infer=config.eta_infer,
                 latent_init=config.latent_init,
+                adaptive=config.adaptive_inference,
+                tolerance=config.inference_tolerance,
+                min_steps=config.min_inference_steps,
+                return_trace=True,
+            )
+            train_raw_metrics = _raw_scale_metrics(
+                model,
+                real_split.x_train,
+                real_split.y_train_raw,
+                split=real_split,
+                config=config,
+            )
+            val_raw_metrics = _raw_scale_metrics(
+                model,
+                real_split.x_val,
+                real_split.y_val_raw,
+                split=real_split,
+                config=config,
+            )
+            test_raw_metrics = _raw_scale_metrics(
+                model,
+                real_split.x_test,
+                real_split.y_test_raw,
+                split=real_split,
+                config=config,
                 return_trace=True,
             )
 
@@ -459,6 +624,9 @@ def run_pcn_benchmark(
                 "train": train_metrics,
                 "val": val_metrics,
                 "test": test_metrics,
+                "train_raw_scale": train_raw_metrics,
+                "val_raw_scale": val_raw_metrics,
+                "test_raw_scale": test_raw_metrics,
             }
             if run_dir is not None:
                 _save_training_artifacts(
@@ -486,10 +654,18 @@ def run_pcn_benchmark(
                     "T_infer_eval": config.T_infer_eval,
                     "T_learn": config.T_learn,
                     "latent_init": config.latent_init,
-                    "test_mse": float(test_metrics["mse"]),
-                    "test_mae": float(test_metrics["mae"]),
-                    "test_mape": float(test_metrics["mape"]),
-                    "test_r2": float(test_metrics["r2"]),
+                    "normalize_targets": int(config.normalize_targets),
+                    "adaptive_inference": int(config.adaptive_inference),
+                    "inference_tolerance": config.inference_tolerance,
+                    "min_inference_steps": config.min_inference_steps,
+                    "evaluation_interval": config.evaluation_interval,
+                    "test_mse": float(test_raw_metrics["mse"]),
+                    "test_mae": float(test_raw_metrics["mae"]),
+                    "test_mape": float(test_raw_metrics["mape"]),
+                    "test_r2": float(test_raw_metrics["r2"]),
+                    "test_normalized_mse": float(test_metrics["mse"]),
+                    "test_normalized_mae": float(test_metrics["mae"]),
+                    "test_normalized_r2": float(test_metrics["r2"]),
                     "test_free_energy": float(test_metrics["free_energy"]),
                     "test_reconstruction_mse": float(test_metrics["reconstruction_mse"]),
                     "test_supervised_mse": float(test_metrics["supervised_mse"]),

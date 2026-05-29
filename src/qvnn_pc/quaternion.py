@@ -84,6 +84,21 @@ def q_matmul(W: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
             f"but x has {x.shape[-2]} entries."
         )
 
+    if W.ndim == 3 and x.ndim in {2, 3}:
+        wr, wi, wj, wk = W.unbind(dim=-1)
+        xr, xi, xj, xk = x.unbind(dim=-1)
+        if x.ndim == 2:
+            r = wr @ xr - wi @ xi - wj @ xj - wk @ xk
+            i = wr @ xi + wi @ xr + wj @ xk - wk @ xj
+            j = wr @ xj - wi @ xk + wj @ xr + wk @ xi
+            k = wr @ xk + wi @ xj - wj @ xi + wk @ xr
+        else:
+            r = xr @ wr.T - xi @ wi.T - xj @ wj.T - xk @ wk.T
+            i = xi @ wr.T + xr @ wi.T + xk @ wj.T - xj @ wk.T
+            j = xj @ wr.T - xk @ wi.T + xr @ wj.T + xi @ wk.T
+            k = xk @ wr.T + xj @ wi.T - xi @ wj.T + xr @ wk.T
+        return torch.stack((r, i, j, k), dim=-1)
+
     products = hamilton_product(W, x.unsqueeze(-3))
     return products.sum(dim=-2)
 
