@@ -110,6 +110,16 @@ def _validate_requested_device(device: torch.device | str | None) -> None:
     raise RuntimeError("CUDA was requested, but PyTorch could not initialize CUDA.")
 
 
+def _make_generator_for_device(device: torch.device | str | None, seed: int) -> torch.Generator:
+    if device is None:
+        generator_device = torch.device("cpu")
+    else:
+        generator_device = torch.device(device)
+    if generator_device.type == "cuda" and not torch.cuda.is_available():
+        generator_device = torch.device("cpu")
+    return torch.Generator(device=generator_device).manual_seed(seed)
+
+
 def _timestamped_run_name() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -389,7 +399,7 @@ def run_cpcn_benchmark(
         quat_split = _quaternion_split(split, normalize_targets=config.normalize_targets).to(config.device)
 
         for repetition in range(1, config.repetitions + 1):
-            generator = torch.Generator(device="cpu").manual_seed(int(repetition * 1e6))
+            generator = _make_generator_for_device(config.device, int(repetition * 1e6))
             model = SplitQuaternionPredictiveCodingNetwork(
                 layer_sizes=config.layer_sizes,
                 activation=config.activation,

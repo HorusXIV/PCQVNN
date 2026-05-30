@@ -62,6 +62,19 @@ def _adjoint_weight(weight: torch.Tensor) -> torch.Tensor:
     return q_conj(weight.transpose(0, 1))
 
 
+def _coerce_generator_device(
+    generator: torch.Generator | None,
+    device: torch.device | str | None,
+) -> torch.Generator | None:
+    if generator is None or device is None:
+        return generator
+    target_device = torch.device(device)
+    generator_device = torch.device(generator.device)
+    if target_device.type == generator_device.type:
+        return generator
+    return None
+
+
 class QuaternionPCNLayer(nn.Module):
     activation_fn: Callable[[torch.Tensor], torch.Tensor]
     activation_deriv: Callable[[torch.Tensor], torch.Tensor]
@@ -78,6 +91,7 @@ class QuaternionPCNLayer(nn.Module):
         dtype: torch.dtype | None = None,
     ) -> None:
         super().__init__()
+        generator = _coerce_generator_device(generator, device)
         self.W = nn.Parameter(
             source_style_weight_init(out_dim, in_dim, generator=generator, device=device, dtype=dtype)
         )
@@ -130,6 +144,7 @@ class SplitQuaternionPredictiveCodingNetwork(nn.Module):
         self.check_finite = bool(check_finite)
 
         activation_fn, activation_deriv = _activation_pair(activation)
+        generator = _coerce_generator_device(generator, device)
         self.layers = nn.ModuleList([
             QuaternionPCNLayer(
                 in_dim=self.layer_sizes[layer_idx + 1],
@@ -434,4 +449,3 @@ class SplitQuaternionPredictiveCodingNetwork(nn.Module):
         metrics["quaternion_mae"] = float(quaternion_mae_loss(y_hat, y_quat).detach().cpu())
         metrics["free_energy"] = self.energy(x, y_quat)
         return metrics
-
