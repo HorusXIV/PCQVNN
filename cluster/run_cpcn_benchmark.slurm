@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=pcqvnn-cpcn
-#SBATCH --partition=h200
+#SBATCH --partition=performance
 #SBATCH --array=0-3%1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
