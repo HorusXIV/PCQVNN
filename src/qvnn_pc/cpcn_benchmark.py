@@ -110,6 +110,10 @@ def _validate_requested_device(device: torch.device | str | None) -> None:
     raise RuntimeError("CUDA was requested, but PyTorch could not initialize CUDA.")
 
 
+def _repetition_seed_offset(benchmark_idx: int, repetition: int, repetitions: int) -> int:
+    return benchmark_idx * repetitions + (repetition - 1)
+
+
 def _make_generator_for_device(device: torch.device | str | None, seed: int) -> torch.Generator:
     if device is None:
         generator_device = torch.device("cpu")
@@ -388,18 +392,24 @@ def run_cpcn_benchmark(
 
     for benchmark_idx, benchmark_name in enumerate(config.benchmarks):
         benchmark = _canonical_benchmark_name(benchmark_name)
-        split = make_benchmark_regression_split(
-            benchmark,
-            n=config.dataset_size,
-            sample_seed=config.sample_seed + benchmark_idx,
-            split_seed=config.split_seed + benchmark_idx,
-            device=None,
-            dtype=config.dtype,
-        )
-        quat_split = _quaternion_split(split, normalize_targets=config.normalize_targets).to(config.device)
-
         for repetition in range(1, config.repetitions + 1):
-            generator = _make_generator_for_device(config.device, int(repetition * 1e6))
+            seed_offset = _repetition_seed_offset(benchmark_idx, repetition, config.repetitions)
+            sample_seed = config.sample_seed + seed_offset
+            split_seed = config.split_seed + seed_offset
+            model_seed = int(1_000_000 + seed_offset)
+            shuffle_seed = int(2_000_000 + seed_offset)
+
+            split = make_benchmark_regression_split(
+                benchmark,
+                n=config.dataset_size,
+                sample_seed=sample_seed,
+                split_seed=split_seed,
+                device=None,
+                dtype=config.dtype,
+            )
+            quat_split = _quaternion_split(split, normalize_targets=config.normalize_targets).to(config.device)
+
+            generator = _make_generator_for_device(config.device, model_seed)
             model = SplitQuaternionPredictiveCodingNetwork(
                 layer_sizes=config.layer_sizes,
                 activation=config.activation,
@@ -414,7 +424,7 @@ def run_cpcn_benchmark(
                 device=config.device,
                 dtype=config.dtype,
             )
-            shuffle_generator = torch.Generator(device="cpu").manual_seed(int(repetition * 1e6) + 17)
+            shuffle_generator = torch.Generator(device="cpu").manual_seed(shuffle_seed)
             history = _fit_model(model, split=quat_split, config=config, shuffle_generator=shuffle_generator)
 
             train_metrics = _evaluate_normalized(model, quat_split.x_train, quat_split.y_train, config=config)
@@ -472,6 +482,10 @@ def run_cpcn_benchmark(
                     "repetition": repetition,
                     "algorithm": ALGORITHM_LABEL,
                     "test_function": benchmark,
+                    "sample_seed": sample_seed,
+                    "split_seed": split_seed,
+                    "model_seed": model_seed,
+                    "shuffle_seed": shuffle_seed,
                     "activation": config.activation,
                     "optimizer": config.optimizer,
                     "layer_sizes": "-".join(str(size) for size in config.layer_sizes),
@@ -493,9 +507,9 @@ def run_cpcn_benchmark(
                     "test_quaternion_mae": float(quaternion_mae_loss(test_pred, quat_split.y_test).detach().cpu()),
                     "test_free_energy": float(test_metrics["free_energy"]),
                     "status": str(history["status"]),
-                    "epochs": int(history["epochs_ran"]),
-                    "runtime_seconds": float(history["runtime"]),
-                    "evals": int(history["evals_ran"]),
+                    "epochs": int(cast(int | float | str, history["epochs_ran"])),
+                    "runtime_seconds": float(cast(int | float | str, history["runtime"])),
+                    "evals": int(cast(int | float | str, history["evals_ran"])),
                 }
             )
 
@@ -517,6 +531,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--benchmark", type=str, default=None)
     parser.add_argument("--device", type=str, default=None)
+    parser.add_argument("--epochs", type=int, default=None)
+    parser.add_argument("--repetitions", type=int, default=None)
+    parser.add_argument("--sample-seed", type=int, default=None)
+    parser.add_argument("--split-seed", type=int, default=None)
     args = parser.parse_args(argv)
 
     config = SCRIPT_CONFIG
@@ -524,6 +542,14 @@ def main(argv: list[str] | None = None) -> int:
         config = replace(config, benchmarks=(_canonical_benchmark_name(args.benchmark),))
     if args.device is not None:
         config = replace(config, device=args.device)
+    if args.epochs is not None:
+        config = replace(config, epochs=args.epochs)
+    if args.repetitions is not None:
+        config = replace(config, repetitions=args.repetitions)
+    if args.sample_seed is not None:
+        config = replace(config, sample_seed=args.sample_seed)
+    if args.split_seed is not None:
+        config = replace(config, split_seed=args.split_seed)
 
     _validate_requested_device(config.device)
     run_dir, summary_path = _prepare_run_directory(args.output)

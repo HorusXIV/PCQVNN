@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
 #SBATCH --mem=32G
-#SBATCH --time=06:00:00
+#SBATCH --time=24:00:00
 #SBATCH --open-mode=append
 #SBATCH --output=logs/%x-%A_%a.out
 
@@ -15,6 +15,10 @@ PROJECT_ROOT="${PROJECT_ROOT:-$SLURM_SUBMIT_DIR}"
 CONTAINER_IMAGE="${CONTAINER_IMAGE:-$PROJECT_ROOT/cluster/pcqvnn.sif}"
 RESULTS_ROOT="${RESULTS_ROOT:-$PROJECT_ROOT/results}"
 RUN_NAME="${RUN_NAME:-cpcn-h200}"
+EPOCHS="${EPOCHS:-250}"
+REPETITIONS="${REPETITIONS:-10}"
+SAMPLE_SEED="${SAMPLE_SEED:-0}"
+SPLIT_SEED="${SPLIT_SEED:-0}"
 
 BENCHMARKS=(ackley griewank rastrigin schwefel)
 BENCHMARK="${BENCHMARKS[$SLURM_ARRAY_TASK_ID]}"
@@ -58,6 +62,10 @@ echo "Run output: $OUTPUT_PATH_IN_CONTAINER"
     "$CONTAINER_IMAGE" \
     python -m qvnn_pc.cpcn_benchmark \
     --benchmark "$BENCHMARK" \
+    --epochs "$EPOCHS" \
+    --repetitions "$REPETITIONS" \
+    --sample-seed "$SAMPLE_SEED" \
+    --split-seed "$SPLIT_SEED" \
     --device cuda \
     --output "$OUTPUT_PATH_IN_CONTAINER" \
     "$@"
