@@ -550,12 +550,18 @@ class PredictiveCodingNetwork(nn.Module):
                     lr=eta_learn,
                 )
 
-            prediction_latents = self.feedforward_latents(x_real)
-            prediction_top_latent = prediction_latents[-1]
-            output_error = self._readout(prediction_top_latent) - y_real
-            readout_update_scale = (prediction_top_latent.square().sum(dim=1) + 1.0).mean().clamp_min(1.0)
-            readout_gradient = (output_error.T @ prediction_top_latent / batch_size) / readout_update_scale
-            readout_bias_gradient = output_error.mean(dim=0) / readout_update_scale
+            top_latent = states[-1]
+            output_error = self._readout(top_latent) - y_real
+            readout_gradient = output_error.T @ top_latent / batch_size
+            readout_bias_gradient = output_error.mean(dim=0)
+            
+            # prediction_latents = self.feedforward_latents(x_real)
+            # prediction_top_latent = prediction_latents[-1]
+            # output_error = self._readout(prediction_top_latent) - y_real
+            # readout_update_scale = (prediction_top_latent.square().sum(dim=1) + 1.0).mean().clamp_min(1.0)
+            # readout_gradient = (output_error.T @ prediction_top_latent / batch_size) / readout_update_scale
+            # readout_bias_gradient = output_error.mean(dim=0) / readout_update_scale
+            
             self._apply_update(
                 param=self.readout_weight,
                 gradient=readout_gradient,

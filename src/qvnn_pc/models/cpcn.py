@@ -390,12 +390,20 @@ class SplitQuaternionPredictiveCodingNetwork(nn.Module):
                     lr=eta_learn,
                 )
 
-            top_latent = self.feedforward_latents(x_quat)[-1]
+            # top_latent = self.feedforward_latents(x_quat)[-1]
+            # output_error = self._readout(top_latent) - y_quat
+            # readout_scale = (top_latent.square().sum(dim=(-1, -2)) + 1.0).mean().clamp_min(1.0)
+            # readout_gradient = q_mul(output_error.unsqueeze(2), q_conj(top_latent).unsqueeze(1)).mean(dim=0)
+            # readout_gradient = readout_gradient / readout_scale
+            # readout_bias_gradient = output_error.mean(dim=0) / readout_scale
+
+            top_latent = states[-1]
             output_error = self._readout(top_latent) - y_quat
-            readout_scale = (top_latent.square().sum(dim=(-1, -2)) + 1.0).mean().clamp_min(1.0)
-            readout_gradient = q_mul(output_error.unsqueeze(2), q_conj(top_latent).unsqueeze(1)).mean(dim=0)
-            readout_gradient = readout_gradient / readout_scale
-            readout_bias_gradient = output_error.mean(dim=0) / readout_scale
+            readout_gradient = q_mul(
+                output_error.unsqueeze(2),
+                q_conj(top_latent).unsqueeze(1),
+            ).mean(dim=0)
+            readout_bias_gradient = output_error.mean(dim=0)
             self._apply_update(
                 param=self.readout_weight,
                 gradient=readout_gradient,
