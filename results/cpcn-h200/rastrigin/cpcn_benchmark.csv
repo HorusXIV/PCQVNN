@@ -1,2 +1,3 @@
-repetition,algorithm,test_function,activation,optimizer,layer_sizes,batch_size,eta_infer,eta_learn,T_infer_train,T_infer_eval,T_learn,latent_init,normalize_targets,adaptive_inference,test_mse,test_mae,test_mape,test_r2,test_normalized_mse,test_normalized_mae,test_quaternion_mae,test_free_energy,status,epochs,runtime_seconds,evals
-1,CPCN,rastrigin,tanh,SGD,1-5-5-5-1,512,0.01,0.0001,16,24,1,feedforward,1,1,396.36309814453125,15.93967056274414,0.2572766840457916,-7.271766662597656e-05,0.9425923228263855,0.777310848236084,0.7773895263671875,0.14766216278076172,completed,250,1083.0252892710268,51
+version https://git-lfs.github.com/spec/v1
+oid sha256:c2cae47c3284ebd2aec403b152bd1a3229a8a8b3efa1d170327df72dcd65207b
+size 3237
