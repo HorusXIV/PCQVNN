@@ -1,0 +1,43 @@
+architectures:
+  cmlp:
+    ackley:
+      lr: 0.00473375604375846
+      optimizer: Adadelta
+      activation: sigmoid
+      batch_size: 1
+    schwefel:
+      lr: 0.000482670346100103
+      optimizer: Adadelta
+      activation: swish
+      batch_size: 1
+    rastrigin:
+      lr: 0.000482670346100103
+      optimizer: Adadelta
+      activation: swish
+      batch_size: 1
+    griewank:
+      lr: 0.000482670346100103
+      optimizer: Adadelta
+      activation: swish
+      batch_size: 1
+  ghr:
+    ackley:
+      lr: 0.00182591629246819
+      optimizer: SGD
+      activation: tanh
+      batch_size: 1
+    schwefel:
+      lr: 0.000285314863382939
+      optimizer: Adadelta
+      activation: leakyrelu
+      batch_size: 1
+    rastrigin:
+      lr: 0.00246161188917812
+      optimizer: Adadelta
+      activation: swish
+      batch_size: 1
+    griewank:
+      lr: 0.000482670346100103
+      optimizer: Adadelta
+      activation: swish
+      batch_size: 1
