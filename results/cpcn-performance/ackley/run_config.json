@@ -1,35 +1,3 @@
-{
-  "benchmarks": [
-    "ackley"
-  ],
-  "layer_sizes": [
-    1,
-    5,
-    5,
-    5,
-    1
-  ],
-  "activation": "tanh",
-  "optimizer": "SGD",
-  "epochs": 2500,
-  "repetitions": 10,
-  "dataset_size": 30000,
-  "sample_seed": 0,
-  "split_seed": 0,
-  "batch_size": 512,
-  "eta_infer": 0.01,
-  "eta_learn": 0.0001,
-  "T_infer_train": 16,
-  "T_infer_eval": 24,
-  "T_learn": 1,
-  "latent_init": "feedforward",
-  "normalize_targets": true,
-  "adaptive_inference": true,
-  "inference_tolerance": 0.001,
-  "min_inference_steps": 4,
-  "check_finite": false,
-  "evaluation_interval": 5,
-  "summary_path": "/workspace/results/cpcn-performance/ackley/cpcn_benchmark.csv",
-  "device": "cuda",
-  "dtype": "torch.float32"
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:35b604c18513b2e95793119eb4ca2178dbca408f47fc1b82966cbcbcdef645d3
+size 706
