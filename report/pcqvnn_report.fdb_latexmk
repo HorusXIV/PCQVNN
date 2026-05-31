@@ -1,12 +1,12 @@
 # Fdb version 4
-["biber pcqvnn_report"] 1780263098.1088 "pcqvnn_report.bcf" "pcqvnn_report.bbl" "pcqvnn_report" 1780264009.66183 0
+["biber pcqvnn_report"] 1780263098.1088 "pcqvnn_report.bcf" "pcqvnn_report.bbl" "pcqvnn_report" 1780264435.96256 0
   "literature/Citations.bib" 1778258752 4902 4451c15fda284c5a480d3a240eb5fa08 ""
-  "pcqvnn_report.bcf" 1780264009.46595 108027 865e1e42d3ef7f1f08ecaadd540793d7 "pdflatex"
+  "pcqvnn_report.bcf" 1780264435.77613 108027 865e1e42d3ef7f1f08ecaadd540793d7 "pdflatex"
   (generated)
   "pcqvnn_report.bbl"
   "pcqvnn_report.blg"
   (rewritten before read)
-["pdflatex"] 1780264007.54327 "/home/lukas/src/Sem4/OML/oml_fs2026/PCQVNN/report/pcqvnn_report.tex" "pcqvnn_report.pdf" "pcqvnn_report" 1780264009.66221 0
+["pdflatex"] 1780264433.89253 "/home/lukas/src/Sem4/OML/oml_fs2026/PCQVNN/report/pcqvnn_report.tex" "pcqvnn_report.pdf" "pcqvnn_report" 1780264435.96296 0
   "/etc/texmf/web2c/texmf.cnf" 1771235181.68999 475 c0e671620eb5563b2130f56340a5fde8 ""
   "/home/lukas/src/Sem4/OML/oml_fs2026/PCQVNN/report/pcqvnn_report.tex" 1780263071.64768 2062 918ae45858eea04f88168a148611045f ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
@@ -298,16 +298,16 @@
   "graphics/generated/learning_curves_cmlp_ghr.pdf" 1780252734 35398 96b7c8e896d9392139c9475c1a7b8f93 ""
   "graphics/generated/pcn_cpcn_training_behavior.pdf" 1780252876 23085 76d7519ee60c0e8bf794e8f58fe3fc49 ""
   "graphics/titleimage.png" 1778239480 60530 6be0157bb77547173c3f87d7b85110e1 ""
-  "pcqvnn_report.aux" 1780264009.45694 6969 75678226d5362e99fc01944d9c7cad6a "pdflatex"
+  "pcqvnn_report.aux" 1780264435.76813 6969 eb82bbfa0e9faee2c89a78ba0eaae5e2 "pdflatex"
   "pcqvnn_report.bbl" 1780263098.6648 12269 67460ce2d261a1461570f437c4ed0639 "biber pcqvnn_report"
-  "pcqvnn_report.out" 1780264009.46094 3076 06eb566ee4e4cf0c4c2393d8a444bcb4 "pdflatex"
-  "pcqvnn_report.run.xml" 1780264009.46815 2536 bf3ef76c3083ee6dbedcfb9c6f2852cb "pdflatex"
+  "pcqvnn_report.out" 1780264435.77213 3076 06eb566ee4e4cf0c4c2393d8a444bcb4 "pdflatex"
+  "pcqvnn_report.run.xml" 1780264435.77794 2536 bf3ef76c3083ee6dbedcfb9c6f2852cb "pdflatex"
   "pcqvnn_report.tex" 1780263071.64768 2062 918ae45858eea04f88168a148611045f ""
   "sections/abstract.tex" 1780263319.88962 1413 a7741ae83fc2f9148777385ac9f52ca5 ""
   "sections/appendix.tex" 1780263383.65666 2017 2d358ca6f0c1c240c539753bb0e4e390 ""
-  "sections/architektur.tex" 1780264007.25151 4492 90bf94a15dbba63c11008a5aa223337a ""
+  "sections/architektur.tex" 1780264184.54928 4418 adc78c6910365fe9ea84b17e3cc27a8e ""
   "sections/einleitung.tex" 1780254802 2822 e8a1b2b3ca2fa09c504e305c11b07d96 ""
-  "sections/experimente.tex" 1780254854 6867 3f53abb6aba2e1b8c52b4734247828fa ""
+  "sections/experimente.tex" 1780264433.62433 6790 c203483f825b02dd0a81a09872951e25 ""
   "sections/grundlagen.tex" 1780263807.87364 3941 b89868d616b8942a2523bfe8ec3319b6 ""
   "sections/schluss.tex" 1780263096.66241 1948 2594be9bb1fb2a24ad1dbb4943cff4ff ""
   (generated)

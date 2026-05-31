@@ -20,20 +20,20 @@ Die Implementierung ist modular. \texttt{src/qvnn\_pc/} enthält Benchmark-Funkt
 
 \subsection{Optimierungsdesign}
 
-Die Hyperparameter der CMLP- und GHR-Baselines wurden nicht durch eine naive Grid Search neu gesucht, sondern aus der DoE-basierten Benchmark-Konfiguration uebernommen. In der Referenzstudie wird dafuer ein Fast-Flexible-Filling-Design verwendet, um Lernrate, Optimierer und Aktivierungsfunktion systematisch ueber den Suchraum zu verteilen \cite{bill2023comparison}. Das ist fuer diese Aufgabe sinnvoller als ein grobes Gitter: Die Optimierung im Quaternionraum ist teuer, Interaktionen zwischen Hyperparametern sind nicht linear, und viele Kombinationen sind numerisch wenig informativ.
+Die Hyperparameter der CMLP- und GHR-Baselines wurden nicht durch eine naive Grid Search neu gesucht, sondern aus der DoE-basierten Benchmark-Konfiguration uebernommen. In der Referenzstudie wird dafür ein Fast-Flexible-Filling-Design verwendet, um Lernrate, Optimierer und Aktivierungsfunktion systematisch über den Suchraum zu verteilen \cite{bill2023comparison}. Das ist fuer diese Aufgabe sinnvoller als ein grobes Gitter: Die Optimierung im Quaternionraum ist teuer, Interaktionen zwischen Hyperparametern sind nicht linear, und viele Kombinationen sind numerisch wenig informativ.
 
-Ein relevantes Detail ist die Batchgroesse. Fuer die reproduzierten Quaternion-Backpropagation-Laeufe wird Batchgroesse 1 verwendet. Das ist nicht nur eine Laufzeitentscheidung, sondern beeinflusst die Optimierungsrichtung. Bei groesseren Batches werden Updates ueber viele Punkte und ueber vier gekoppelte Komponenten gemittelt. In Vorversuchen zeigte sich, dass sich gegenlaeufige Gradienten teilweise ausgleichen koennen; das Modell bewegt sich dann eher in Richtung einer Mittelwertvorhersage als in Richtung einer lokal passenden Funktionsapproximation.
+Ein relevantes Detail ist die Batchgrösse. Für die reproduzierten Quaternion-Backpropagation-Laeufe wird Batchgrösse 1 verwendet. Das ist nicht nur eine Laufzeitentscheidung, sondern beeinflusst die Optimierungsrichtung. Bei grösseren Batches werden Updates über viele Punkte und über vier gekoppelte Komponenten gemittelt. In Vorversuchen zeigte sich, dass sich gegenläufige Gradienten teilweise ausgleichen können; das Modell bewegt sich dann eher in Richtung einer Mittelwertvorhersage als in Richtung einer lokal passenden Funktionsapproximation.
 
-Bei PCN und CPCN kommen weitere Hyperparameter hinzu: Inferenzrate $\eta_{infer}$, Lernrate $\eta_{learn}$, Anzahl Inferenzschritte $T_{infer}$, Anzahl Lernschritte, Initialisierung der latenten Variablen und Testmodus. Dadurch ist die Optimierung nicht direkt mit einem klassischen NN vergleichbar. Ein klassisches NN optimiert primaer Gewichte; ein PCN optimiert zuerst latente Zustaende und danach Gewichte. Entscheidend ist deshalb nicht nur, ob die Free Energy sinkt, sondern ob die Inferenz bei unbekannten Testpunkten zu einer korrekten Ausgabe konvergiert.
+Bei PCN und CPCN kommen weitere Hyperparameter hinzu: Inferenzrate $\eta_{infer}$, Lernrate $\eta_{learn}$, Anzahl Inferenzschritte $T_{infer}$, Anzahl Lernschritte, Initialisierung der latenten Variablen und Testmodus. Dadurch ist die Optimierung nicht direkt mit einem klassischen NN vergleichbar. Ein klassisches NN optimiert primär Gewichte; ein PCN optimiert zuerst latente Zustände und danach Gewichte. Entscheidend ist deshalb nicht nur, ob die Free Energy sinkt, sondern ob die Inferenz bei unbekannten Testpunkten zu einer korrekten Ausgabe konvergiert.
 
 \subsection{Hypothesen}
 
 Aus Literatur und Voruntersuchungen ergeben sich drei Hypothesen:
 
 \begin{enumerate}
-    \item \textbf{H1:} CMLP ist auf den Benchmark-Funktionen die staerkste Quaternion-Backpropagation-Baseline.
+    \item \textbf{H1:} CMLP ist auf den Benchmark-Funktionen die stärkste Quaternion-Backpropagation-Baseline.
     \item \textbf{H2:} PCN kann interne Fehler reduzieren, aber die freie Test-Inferenz ist anfaelliger fuer Stagnation als klassische Backpropagation.
-    \item \textbf{H3:} CPCN sollte stabiler sein als ein reellwertiges PCN, weil die Daten bereits quaternionwertig repraesentiert sind. Unklar ist, ob diese Stabilitaet bereits zu guter Generalisierung fuehrt.
+    \item \textbf{H3:} CPCN sollte stabiler sein als ein reellwertiges PCN, weil die Daten bereits quaternionwertig repräsentiert sind.
 \end{enumerate}
 
 Alle Abbildungen sind aus Platzgruenden im Anhang platziert. Im Haupttext werden die wichtigsten Werte und Interpretationen diskutiert.
