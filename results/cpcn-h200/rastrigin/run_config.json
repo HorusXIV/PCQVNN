@@ -1,35 +1,3 @@
-{
-  "benchmarks": [
-    "rastrigin"
-  ],
-  "layer_sizes": [
-    1,
-    5,
-    5,
-    5,
-    1
-  ],
-  "activation": "tanh",
-  "optimizer": "SGD",
-  "epochs": 250,
-  "repetitions": 1,
-  "dataset_size": 30000,
-  "sample_seed": 0,
-  "split_seed": 0,
-  "batch_size": 512,
-  "eta_infer": 0.01,
-  "eta_learn": 0.0001,
-  "T_infer_train": 16,
-  "T_infer_eval": 24,
-  "T_learn": 1,
-  "latent_init": "feedforward",
-  "normalize_targets": true,
-  "adaptive_inference": true,
-  "inference_tolerance": 0.001,
-  "min_inference_steps": 4,
-  "check_finite": false,
-  "evaluation_interval": 5,
-  "summary_path": "/workspace/results/cpcn-h200/rastrigin/cpcn_benchmark.csv",
-  "device": "cuda",
-  "dtype": "torch.float32"
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:6b5e13d9cc9ff58d046d1417d3ff2058fd455c4ce72fe5c60626b88ea903cd0e
+size 704
