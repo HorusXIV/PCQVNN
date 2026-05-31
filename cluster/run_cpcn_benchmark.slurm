@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=pcqvnn-cpcn
-#SBATCH --partition=performance
-#SBATCH --array=0-3%1
+#SBATCH --partition=top6
+#SBATCH --array=0-3%4
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
 #SBATCH --mem=32G
@@ -14,8 +14,8 @@ set -euo pipefail
 PROJECT_ROOT="${PROJECT_ROOT:-$SLURM_SUBMIT_DIR}"
 CONTAINER_IMAGE="${CONTAINER_IMAGE:-$PROJECT_ROOT/cluster/pcqvnn.sif}"
 RESULTS_ROOT="${RESULTS_ROOT:-$PROJECT_ROOT/results}"
-RUN_NAME="${RUN_NAME:-cpcn-h200}"
-EPOCHS="${EPOCHS:-250}"
+RUN_NAME="${RUN_NAME:-cpcn-performance}"
+EPOCHS="${EPOCHS:-2500}"
 REPETITIONS="${REPETITIONS:-10}"
 SAMPLE_SEED="${SAMPLE_SEED:-0}"
 SPLIT_SEED="${SPLIT_SEED:-0}"
