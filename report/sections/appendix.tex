@@ -1,32 +1,35 @@
-\begin{appendix} %Anhang
-\section{Ein Anhang}
+\appendix
+\section{Ergaenzende Abbildungen}
 
-\lipsum[61-64]
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{graphics/generated/holdout_comparison.pdf}
+\caption{Vergleich der Holdout-Metriken für CMLP, GHR, PCN und CPCN. CMLP und GHR verwenden fünf Wiederholungen, CPCN zehn Wiederholungen und PCN eine Wiederholung pro Funktion.}
+\label{fig:holdout-comparison}
+\end{figure}
 
-\subsection{Aufgabenstellung im Originalwortlaut}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{graphics/generated/learning_curves_cmlp_ghr.pdf}
+\caption{Validierungs-QMAE der Quaternion-Baselines. CMLP zeigt auf mehreren Funktionen eine schnelle Anfangsverbesserung und danach langsamere weitere Verbesserung.}
+\label{fig:learning-curves}
+\end{figure}
 
-\lipsum[34]
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{graphics/generated/pcn_cpcn_training_behavior.pdf}
+\caption{Optimierungsverhalten der PC-basierten Modelle am Beispiel Ackley. Beim reellwertigen PCN bleibt die freie Validierungs-MAPE nahe 1.0. Beim CPCN sinkt die Free Energy sichtbar, während die Validierungs-MAE nur sehr langsam reagiert.}
+\label{fig:pcn-cpcn}
+\end{figure}
 
-\subsection{Gesamtübersicht}
+\section{Hinweise zu Code und Artefakten}
 
-\lipsum[35]
+Die wichtigsten Artefakte liegen in folgenden Ordnern:
+\begin{itemize}
+    \item \texttt{src/qvnn\_pc/}: Implementierung der Benchmark-Funktionen, Datensplits, Quaternion-Operationen, CMLP, GHR, PCN und CPCN.
+    \item \texttt{notebooks/}: Sanity-Checks, Reproduktion der Baselines, PCN-Diagnostik, MNIST-Probe und Auswertung gespeicherter Resultate.
+    \item \texttt{results/}: gespeicherte CSV-Zusammenfassungen, Lernverlaeufe, Modelle und generierte Plots.
+    \item \texttt{cluster/}: SLURM-Skripte für laengere Benchmark-Laeufe.
+\end{itemize}
 
-\subsection{Berechnungen / Resultate Umfrage}
-
-\lipsum[36]
-
-\subsection{Tests – Screenshots}
-
-\lipsum[37]
-
-%\includepdf[pages={1-2},nup=1x2,landscape=true,scale=0.85,offset=10 -40,pagecommand={\section{Eingefügtes Dokument; zwei Seiten auf einer}\label{app:Aufgabenstellung}\thispagestyle{myheadings}}]{appendix/aufgabenstellung.pdf} \newpage
-
-%%Bei mehrseitigen Dokumenten die folgenden Seiten ohne Überschrift:
-%\includepdf[pages={3-6},nup=1x2,landscape=true,scale=0.85,offset=10 -40,pagecommand={\thispagestyle{myheadings}}]{appendix/aufgabenstellung.pdf} \newpage
-
-%\includepdf[pages={1},nup=1x1,landscape=true,scale=0.85,offset=10 -40,pagecommand={\section{Eingefügte PDF-Tabelle}\label{app:Timetable}\thispagestyle{myheadings}}]{appendix/timeline_example.pdf} \newpage
-
-%%Bei mehrseitigen Dokumenten die folgenden Seiten ohne Überschrift:
-%\includepdf[pages={2-5},nup=1x1,landscape=true,scale=0.85,offset=0 -20,pagecommand={\thispagestyle{myheadings}}]{appendix/timeline_example.pdf} \newpage
-
-\end{appendix}
+Der Bericht verwendet für die Tabellen im Hauptteil die finalen Resultate aus \texttt{results/archcmp\_resume/}, \texttt{results/pcn-h200/} und \texttt{results/cpcn-h200/}. Der Schwefel-Lauf des reellwertigen PCN ist als \texttt{non\_finite} markiert und wird deshalb nicht als erfolgreiches Training interpretiert.

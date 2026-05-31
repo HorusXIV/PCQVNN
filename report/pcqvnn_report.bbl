@@ -19,32 +19,6 @@
 
 \refsection{0}
   \datalist[entry]{none/global//global/global}
-    \entry{hamilton1844quaternions}{article}{}
-      \name{author}{1}{}{%
-        {{hash=669f29d983faa7a666a11ac2f96d3d92}{%
-           family={Hamilton},
-           familyi={H\bibinitperiod},
-           given={William\bibnamedelima Rowan},
-           giveni={W\bibinitperiod\bibinitdelim R\bibinitperiod}}}%
-      }
-      \strng{namehash}{669f29d983faa7a666a11ac2f96d3d92}
-      \strng{fullhash}{669f29d983faa7a666a11ac2f96d3d92}
-      \strng{bibnamehash}{669f29d983faa7a666a11ac2f96d3d92}
-      \strng{authorbibnamehash}{669f29d983faa7a666a11ac2f96d3d92}
-      \strng{authornamehash}{669f29d983faa7a666a11ac2f96d3d92}
-      \strng{authorfullhash}{669f29d983faa7a666a11ac2f96d3d92}
-      \field{sortinit}{1}
-      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{journaltitle}{The London, Edinburgh, and Dublin Philosophical Magazine and Journal of Science}
-      \field{number}{163}
-      \field{title}{On Quaternions; or on a New System of Imaginaries in Algebra}
-      \field{volume}{25}
-      \field{year}{1844}
-      \field{pages}{10\bibrangedash 13}
-      \range{pages}{4}
-    \endentry
     \entry{bill2023comparison}{article}{}
       \name{author}{3}{}{%
         {{hash=d7110540c3e1e75830bd28d83fa79433}{%
@@ -92,130 +66,60 @@
       \endverb
       \keyw{Clifford algebra,Clifford neural networks,Design of experiments,Geometric algebra,GHR calculus,Hypercomplex numbers,Latin hypercube sampling,Quaternion neural networks,Space filling designs}
     \endentry
-    \entry{kuipers1999quaternions}{book}{}
-      \name{author}{1}{}{%
-        {{hash=6f6cb9d14f282595edbde9b8a9b025e2}{%
-           family={Kuipers},
+    \entry{article}{article}{}
+      \name{author}{5}{}{%
+        {{hash=9953b4a20f1eb6e3fdc7713f81fd0bd0}{%
+           family={Takahashi},
+           familyi={T\bibinitperiod},
+           given={Kazuhiko},
+           giveni={K\bibinitperiod}}}%
+        {{hash=c37cf0d96a629f50d1b6694457873dc5}{%
+           family={Fujimoto},
+           familyi={F\bibinitperiod},
+           given={Ayane},
+           giveni={A\bibinitperiod}}}%
+        {{hash=6720f634d9d411fd4935ed3e42d293b2}{%
+           family={Kawakami},
            familyi={K\bibinitperiod},
-           given={Jack\bibnamedelima B.},
-           giveni={J\bibinitperiod\bibinitdelim B\bibinitperiod}}}%
-      }
-      \list{publisher}{1}{%
-        {Princeton University Press}%
-      }
-      \strng{namehash}{6f6cb9d14f282595edbde9b8a9b025e2}
-      \strng{fullhash}{6f6cb9d14f282595edbde9b8a9b025e2}
-      \strng{bibnamehash}{6f6cb9d14f282595edbde9b8a9b025e2}
-      \strng{authorbibnamehash}{6f6cb9d14f282595edbde9b8a9b025e2}
-      \strng{authornamehash}{6f6cb9d14f282595edbde9b8a9b025e2}
-      \strng{authorfullhash}{6f6cb9d14f282595edbde9b8a9b025e2}
-      \field{sortinit}{2}
-      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{title}{Quaternions and Rotation Sequences: A Primer with Applications to Orbits, Aerospace, and Virtual Reality}
-      \field{year}{1999}
-    \endentry
-    \entry{helmholtz1867physiological}{book}{}
-      \name{author}{1}{}{%
-        {{hash=b18e475210ebadcffcbb9eb360a03fe3}{%
-           family={Helmholtz},
+           given={Saki},
+           giveni={S\bibinitperiod}}}%
+        {{hash=a2e78af3c048ae2367937c56b8194cba}{%
+           family={Mitera},
+           familyi={M\bibinitperiod},
+           given={Hinako},
+           giveni={H\bibinitperiod}}}%
+        {{hash=c8d374be150b33db56163a7f5eff6228}{%
+           family={Hashimoto},
            familyi={H\bibinitperiod},
-           given={Hermann\bibnamedelima von},
-           giveni={H\bibinitperiod\bibinitdelim v\bibinitperiod}}}%
+           given={Masafumi},
+           giveni={M\bibinitperiod}}}%
       }
-      \list{location}{1}{%
-        {New York}%
-      }
-      \list{publisher}{1}{%
-        {Dover}%
-      }
-      \strng{namehash}{b18e475210ebadcffcbb9eb360a03fe3}
-      \strng{fullhash}{b18e475210ebadcffcbb9eb360a03fe3}
-      \strng{bibnamehash}{b18e475210ebadcffcbb9eb360a03fe3}
-      \strng{authorbibnamehash}{b18e475210ebadcffcbb9eb360a03fe3}
-      \strng{authornamehash}{b18e475210ebadcffcbb9eb360a03fe3}
-      \strng{authorfullhash}{b18e475210ebadcffcbb9eb360a03fe3}
-      \field{sortinit}{4}
-      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \strng{namehash}{42e94a8f20d18b7b603ee9b85a41b9ea}
+      \strng{fullhash}{d9fd6754237446b6ea97d286e3b5e01a}
+      \strng{bibnamehash}{d9fd6754237446b6ea97d286e3b5e01a}
+      \strng{authorbibnamehash}{d9fd6754237446b6ea97d286e3b5e01a}
+      \strng{authornamehash}{42e94a8f20d18b7b603ee9b85a41b9ea}
+      \strng{authorfullhash}{d9fd6754237446b6ea97d286e3b5e01a}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
-      \field{note}{English translation by J. P. C. Southall, 3rd ed., 1962}
-      \field{title}{Treatise on Physiological Optics, Volume III: Concerning the Perceptions in General}
-      \field{year}{1867}
-    \endentry
-    \entry{barlow1961possible}{incollection}{}
-      \name{author}{1}{}{%
-        {{hash=14b1e77da7b8eabc844c9c8b2361d633}{%
-           family={Barlow},
-           familyi={B\bibinitperiod},
-           given={Horace\bibnamedelima B.},
-           giveni={H\bibinitperiod\bibinitdelim B\bibinitperiod}}}%
-      }
-      \name{editor}{1}{}{%
-        {{hash=5a38aedaf70b44bce9d1dce40a22cd46}{%
-           family={Rosenblith},
-           familyi={R\bibinitperiod},
-           given={Walter\bibnamedelima A.},
-           giveni={W\bibinitperiod\bibinitdelim A\bibinitperiod}}}%
-      }
-      \list{location}{1}{%
-        {Cambridge, MA}%
-      }
-      \list{publisher}{1}{%
-        {MIT Press}%
-      }
-      \strng{namehash}{14b1e77da7b8eabc844c9c8b2361d633}
-      \strng{fullhash}{14b1e77da7b8eabc844c9c8b2361d633}
-      \strng{bibnamehash}{14b1e77da7b8eabc844c9c8b2361d633}
-      \strng{authorbibnamehash}{14b1e77da7b8eabc844c9c8b2361d633}
-      \strng{authornamehash}{14b1e77da7b8eabc844c9c8b2361d633}
-      \strng{authorfullhash}{14b1e77da7b8eabc844c9c8b2361d633}
-      \strng{editorbibnamehash}{5a38aedaf70b44bce9d1dce40a22cd46}
-      \strng{editornamehash}{5a38aedaf70b44bce9d1dce40a22cd46}
-      \strng{editorfullhash}{5a38aedaf70b44bce9d1dce40a22cd46}
-      \field{sortinit}{4}
-      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{booktitle}{Sensory Communication}
-      \field{title}{Possible Principles Underlying the Transformation of Sensory Messages}
-      \field{year}{1961}
-      \field{pages}{217\bibrangedash 234}
-      \range{pages}{18}
-    \endentry
-    \entry{rao1999predictive}{article}{}
-      \name{author}{2}{}{%
-        {{hash=9606e9a47bdf4495fb48cd4ca5579f05}{%
-           family={Rao},
-           familyi={R\bibinitperiod},
-           given={Rajesh\bibnamedelimb P.\bibnamedelimi N.},
-           giveni={R\bibinitperiod\bibinitdelim P\bibinitperiod\bibinitdelim N\bibinitperiod}}}%
-        {{hash=462fce8922fb76159172aca4abd82703}{%
-           family={Ballard},
-           familyi={B\bibinitperiod},
-           given={Dana\bibnamedelima H.},
-           giveni={D\bibinitperiod\bibinitdelim H\bibinitperiod}}}%
-      }
-      \strng{namehash}{ae7358158df58ce92875977fbaf402a7}
-      \strng{fullhash}{ae7358158df58ce92875977fbaf402a7}
-      \strng{bibnamehash}{ae7358158df58ce92875977fbaf402a7}
-      \strng{authorbibnamehash}{ae7358158df58ce92875977fbaf402a7}
-      \strng{authornamehash}{ae7358158df58ce92875977fbaf402a7}
-      \strng{authorfullhash}{ae7358158df58ce92875977fbaf402a7}
-      \field{sortinit}{4}
-      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
-      \field{labelnamesource}{author}
-      \field{labeltitlesource}{title}
-      \field{journaltitle}{Nature Neuroscience}
-      \field{number}{1}
-      \field{title}{Predictive Coding in the Visual Cortex: A Functional Interpretation of Some Extra-Classical Receptive-Field Effects}
-      \field{volume}{2}
-      \field{year}{1999}
-      \field{pages}{79\bibrangedash 87}
-      \range{pages}{9}
+      \field{journaltitle}{Journal of the Institute of Industrial Applications Engineers}
+      \field{month}{1}
+      \field{title}{Optimal Predictive Control Using Quaternion-Valued Neural Network-Based System Identification}
+      \field{volume}{13}
+      \field{year}{2025}
+      \field{dateera}{ce}
+      \field{pages}{11\bibrangedash 20}
+      \range{pages}{10}
       \verb{doi}
-      \verb 10.1038/4580
+      \verb 10.12792/JIIAE.13.11
+      \endverb
+      \verb{urlraw}
+      \verb https://www.researchgate.net/publication/391616756_Optimal_Predictive_Control_Using_Quaternion-valued_Neural_Network-based_System_Identification
+      \endverb
+      \verb{url}
+      \verb https://www.researchgate.net/publication/391616756_Optimal_Predictive_Control_Using_Quaternion-valued_Neural_Network-based_System_Identification
       \endverb
     \endentry
     \entry{stenlund2025pcn}{misc}{}
@@ -232,8 +136,8 @@
       \strng{authorbibnamehash}{42feae475651b21cf1da40a299244719}
       \strng{authornamehash}{42feae475651b21cf1da40a299244719}
       \strng{authorfullhash}{42feae475651b21cf1da40a299244719}
-      \field{sortinit}{4}
-      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{sortinit}{3}
+      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{eprintclass}{cs.NE}
@@ -248,6 +152,40 @@
       \endverb
       \verb{url}
       \verb https://arxiv.org/abs/2506.06332
+      \endverb
+    \endentry
+    \entry{buchholz2008cmlp}{article}{}
+      \name{author}{2}{}{%
+        {{hash=127d47791eb6729763506ce2a77718ce}{%
+           family={Buchholz},
+           familyi={B\bibinitperiod},
+           given={Sven},
+           giveni={S\bibinitperiod}}}%
+        {{hash=e23c809210d6c86a6081ab65f31201c1}{%
+           family={Sommer},
+           familyi={S\bibinitperiod},
+           given={Gerald},
+           giveni={G\bibinitperiod}}}%
+      }
+      \strng{namehash}{f0e59ae009f80f4dd9677b09242737c2}
+      \strng{fullhash}{f0e59ae009f80f4dd9677b09242737c2}
+      \strng{bibnamehash}{f0e59ae009f80f4dd9677b09242737c2}
+      \strng{authorbibnamehash}{f0e59ae009f80f4dd9677b09242737c2}
+      \strng{authornamehash}{f0e59ae009f80f4dd9677b09242737c2}
+      \strng{authorfullhash}{f0e59ae009f80f4dd9677b09242737c2}
+      \field{sortinit}{4}
+      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Neural Networks}
+      \field{number}{7}
+      \field{title}{On Clifford Neurons and Clifford Multi-Layer Perceptrons}
+      \field{volume}{21}
+      \field{year}{2008}
+      \field{pages}{925\bibrangedash 935}
+      \range{pages}{11}
+      \verb{doi}
+      \verb 10.1016/j.neunet.2008.03.004
       \endverb
     \endentry
     \entry{xu2015enabling}{article}{}
@@ -279,8 +217,8 @@
       \strng{authorbibnamehash}{8b44b8d7883e32ddd40258ce560d1c04}
       \strng{authornamehash}{10779ff8af5f3cf00af61f7e9a3c9c76}
       \strng{authorfullhash}{8b44b8d7883e32ddd40258ce560d1c04}
-      \field{sortinit}{9}
-      \field{sortinithash}{0a5ebc79d83c96b6579069544c73c7d4}
+      \field{sortinit}{6}
+      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{Royal Society Open Science}
@@ -292,6 +230,79 @@
       \range{pages}{1}
       \verb{doi}
       \verb 10.1098/rsos.150255
+      \endverb
+    \endentry
+    \entry{whittington2017approximation}{article}{}
+      \name{author}{2}{}{%
+        {{hash=ea32d85e283e433025e30b6b68ea120c}{%
+           family={Whittington},
+           familyi={W\bibinitperiod},
+           given={James\bibnamedelimb C.\bibnamedelimi R.},
+           giveni={J\bibinitperiod\bibinitdelim C\bibinitperiod\bibinitdelim R\bibinitperiod}}}%
+        {{hash=9e7da25f8bbab1f942bbdedf221c9970}{%
+           family={Bogacz},
+           familyi={B\bibinitperiod},
+           given={Rafal},
+           giveni={R\bibinitperiod}}}%
+      }
+      \strng{namehash}{6b039c02be8ec49fdf080417723431ed}
+      \strng{fullhash}{6b039c02be8ec49fdf080417723431ed}
+      \strng{bibnamehash}{6b039c02be8ec49fdf080417723431ed}
+      \strng{authorbibnamehash}{6b039c02be8ec49fdf080417723431ed}
+      \strng{authornamehash}{6b039c02be8ec49fdf080417723431ed}
+      \strng{authorfullhash}{6b039c02be8ec49fdf080417723431ed}
+      \field{sortinit}{7}
+      \field{sortinithash}{108d0be1b1bee9773a1173443802c0a3}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Neural Computation}
+      \field{number}{5}
+      \field{title}{An Approximation of the Error Backpropagation Algorithm in a Predictive Coding Network with Local Hebbian Synaptic Plasticity}
+      \field{volume}{29}
+      \field{year}{2017}
+      \field{pages}{1229\bibrangedash 1262}
+      \range{pages}{34}
+      \verb{doi}
+      \verb 10.1162/NECO_a_00949
+      \endverb
+    \endentry
+    \entry{millidge2022predictive}{article}{}
+      \name{author}{3}{}{%
+        {{hash=dcf103531a4bb5a439a2233cf52e9703}{%
+           family={Millidge},
+           familyi={M\bibinitperiod},
+           given={Beren},
+           giveni={B\bibinitperiod}}}%
+        {{hash=3f98dc382188ff01295eb411612cb9ae}{%
+           family={Tschantz},
+           familyi={T\bibinitperiod},
+           given={Alexander},
+           giveni={A\bibinitperiod}}}%
+        {{hash=6ba2af6672c84ba8cffc8b86bc35d608}{%
+           family={Buckley},
+           familyi={B\bibinitperiod},
+           given={Christopher\bibnamedelima L.},
+           giveni={C\bibinitperiod\bibinitdelim L\bibinitperiod}}}%
+      }
+      \strng{namehash}{3ed9c4c4dddda6121f772bc608a4d60b}
+      \strng{fullhash}{3ed9c4c4dddda6121f772bc608a4d60b}
+      \strng{bibnamehash}{3ed9c4c4dddda6121f772bc608a4d60b}
+      \strng{authorbibnamehash}{3ed9c4c4dddda6121f772bc608a4d60b}
+      \strng{authornamehash}{3ed9c4c4dddda6121f772bc608a4d60b}
+      \strng{authorfullhash}{3ed9c4c4dddda6121f772bc608a4d60b}
+      \field{sortinit}{7}
+      \field{sortinithash}{108d0be1b1bee9773a1173443802c0a3}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Neural Computation}
+      \field{number}{6}
+      \field{title}{Predictive Coding Approximates Backprop along Arbitrary Computation Graphs}
+      \field{volume}{34}
+      \field{year}{2022}
+      \field{pages}{1329\bibrangedash 1368}
+      \range{pages}{40}
+      \verb{doi}
+      \verb 10.1162/neco_a_01497
       \endverb
     \endentry
   \enddatalist

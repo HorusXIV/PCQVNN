@@ -395,3 +395,39 @@ class CMLPQuaternionMLP(nn.Module):
         history["best_validation_loss"] = best_checkpoint_loss
         history["epochs_ran"] = len(history["quaternion_mae"])  # type: ignore[arg-type]
         return history
+
+    @torch.no_grad()
+    def fit_online_source_style(
+        self,
+        x_train: torch.Tensor,
+        y_train: torch.Tensor,
+        *,
+        x_val: torch.Tensor | None = None,
+        y_val: torch.Tensor | None = None,
+        epochs: int = 1,
+        shuffle_generator: torch.Generator | None = None,
+        early_stopping: bool = False,
+        early_stopping_window: int = 5,
+        early_stopping_threshold: float = 0.5,
+    ) -> dict[str, list[float] | float | int]:
+        """Compatibility wrapper for source-style one-sample updates."""
+        target_device = self.weights[0].device
+        target_dtype = self.weights[0].dtype
+        x_train = x_train.to(device=target_device, dtype=target_dtype)
+        y_train = y_train.to(device=target_device, dtype=target_dtype)
+        if x_val is not None:
+            x_val = x_val.to(device=target_device, dtype=target_dtype)
+        if y_val is not None:
+            y_val = y_val.to(device=target_device, dtype=target_dtype)
+        return self.fit(
+            x_train,
+            y_train,
+            x_val=x_val,
+            y_val=y_val,
+            epochs=epochs,
+            batch_size=1,
+            shuffle_generator=shuffle_generator,
+            early_stopping=early_stopping,
+            early_stopping_window=early_stopping_window,
+            early_stopping_threshold=early_stopping_threshold,
+        )

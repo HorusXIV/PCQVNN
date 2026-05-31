@@ -215,6 +215,7 @@ marimo/_lsp/
 __marimo__/
 
 # Streamlit
-.streamlit/secrets.tomlcluster/pcqvnn.sif
+.streamlit/secrets.toml
 
-**/data/
+cluster/pcqvnn.sif
+notebooks/data/

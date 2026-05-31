@@ -2365,23 +2365,18 @@
     <bcf:datasource type="file" datatype="bibtex" glob="false">literature/Citations.bib</bcf:datasource>
   </bcf:bibdata>
   <bcf:section number="0">
-    <bcf:citekey order="1" intorder="1">hamilton1844quaternions</bcf:citekey>
-    <bcf:citekey order="1" intorder="2">bill2023comparison</bcf:citekey>
-    <bcf:citekey order="2" intorder="1">kuipers1999quaternions</bcf:citekey>
-    <bcf:citekey order="2" intorder="2">bill2023comparison</bcf:citekey>
-    <bcf:citekey order="3" intorder="1">bill2023comparison</bcf:citekey>
-    <bcf:citekey order="4" intorder="1">helmholtz1867physiological</bcf:citekey>
-    <bcf:citekey order="4" intorder="2">barlow1961possible</bcf:citekey>
-    <bcf:citekey order="4" intorder="3">rao1999predictive</bcf:citekey>
-    <bcf:citekey order="4" intorder="4">stenlund2025pcn</bcf:citekey>
-    <bcf:citekey order="5" intorder="1">stenlund2025pcn</bcf:citekey>
-    <bcf:citekey order="6" intorder="1">bill2023comparison</bcf:citekey>
-    <bcf:citekey order="7" intorder="1">bill2023comparison</bcf:citekey>
+    <bcf:citekey order="1" intorder="1">bill2023comparison</bcf:citekey>
+    <bcf:citekey order="1" intorder="2">article</bcf:citekey>
+    <bcf:citekey order="2" intorder="1">bill2023comparison</bcf:citekey>
+    <bcf:citekey order="3" intorder="1">stenlund2025pcn</bcf:citekey>
+    <bcf:citekey order="4" intorder="1">buchholz2008cmlp</bcf:citekey>
+    <bcf:citekey order="4" intorder="2">bill2023comparison</bcf:citekey>
+    <bcf:citekey order="5" intorder="1">bill2023comparison</bcf:citekey>
+    <bcf:citekey order="6" intorder="1">xu2015enabling</bcf:citekey>
+    <bcf:citekey order="7" intorder="1">stenlund2025pcn</bcf:citekey>
+    <bcf:citekey order="7" intorder="2">whittington2017approximation</bcf:citekey>
+    <bcf:citekey order="7" intorder="3">millidge2022predictive</bcf:citekey>
     <bcf:citekey order="8" intorder="1">bill2023comparison</bcf:citekey>
-    <bcf:citekey order="9" intorder="1">xu2015enabling</bcf:citekey>
-    <bcf:citekey order="10" intorder="1">bill2023comparison</bcf:citekey>
-    <bcf:citekey order="11" intorder="1">stenlund2025pcn</bcf:citekey>
-    <bcf:citekey order="12" intorder="1">stenlund2025pcn</bcf:citekey>
   </bcf:section>
   <!-- SORTING TEMPLATES -->
   <bcf:sortingtemplate name="none">

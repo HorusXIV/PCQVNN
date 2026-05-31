@@ -1,3 +1,86 @@
-\section{Resutate}
+\section{Optimierungsergebnisse}
 
-\lipsum[27]
+\subsection{CMLP und GHR}
+
+Tabelle~\ref{tab:cmlp-ghr-results} fasst die reproduzierten Optimierungsergebnisse fuer CMLP und GHR zusammen. Pro Funktion und Modell liegen fuenf Wiederholungen vor. Niedrigere MAPE-Werte und hoehere $R^2$-Werte sind besser. Die Werte sind Holdout-Metriken und damit nicht nur Trainingsfehler, sondern ein Test der generalisierenden Optimierung.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Holdout-Resultate der Quaternion-Baselines. Werte sind Mittelwerte $\pm$ Standardabweichung ueber fuenf Wiederholungen.}
+\label{tab:cmlp-ghr-results}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{llrr}
+\toprule
+Funktion & Modell & MAPE & $R^2$ \\
+\midrule
+Ackley & CMLP & $0.0157\pm0.0003$ & $0.8680\pm0.0070$ \\
+Ackley & GHR  & $0.0377\pm0.0000$ & $-0.0508\pm0.0118$ \\
+Griewank & CMLP & $0.0041\pm0.0009$ & $0.9999\pm0.0000$ \\
+Griewank & GHR  & $0.0107\pm0.0057$ & $0.9992\pm0.0009$ \\
+Rastrigin & CMLP & $0.1754\pm0.0003$ & $0.4945\pm0.0012$ \\
+Rastrigin & GHR  & $0.1761\pm0.0002$ & $0.4931\pm0.0019$ \\
+Schwefel & CMLP & $0.1932\pm0.0009$ & $0.1012\pm0.0006$ \\
+Schwefel & GHR  & $0.1913\pm0.0007$ & $0.1326\pm0.0069$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Die Ergebnisse stuetzen H1 weitgehend. CMLP ist auf Ackley, Griewank und Rastrigin besser als GHR. Besonders deutlich ist der Unterschied auf Ackley. Auf Schwefel ist GHR leicht besser. Diese Ausnahme ist plausibel, weil Schwefel die schwierigste und am schlechtesten approximierte Funktion ist. Optimierungstechnisch ist relevant, dass CMLP nicht nur tiefere Endfehler erreicht, sondern auf mehreren Funktionen nach einem schnellen Anfangsabfall noch ueber viele Epochen weiter verbessert wird (Abb.~\ref{fig:learning-curves}). Die DoE-gewaehlten Hyperparameter sind damit nicht nur formal reproduziert, sondern fuehren auch in dieser Implementierung zu einer stabilen Trainingsdynamik.
+
+\subsection{Reellwertiges PCN}
+
+Das reellwertige PCN wurde auf allen vier Funktionen gestartet. Drei Laeufe wurden abgeschlossen; der Schwefel-Lauf endete vor dem Training mit nicht-finiten Werten und wird deshalb nur als Fehlversuch dokumentiert. Die abgeschlossenen Test-MAPEs liegen nahe bei 1.0 und die $R^2$-Werte sind negativ. Damit approximiert das reellwertige PCN die Funktionen in dieser Konfiguration nicht brauchbar. Das ist vor allem ein Optimierungsresultat: Die interne Inferenz kann Fehlerterme bearbeiten, aber die gefundene Dynamik erzeugt in der freien Test-Inferenz keine passende Abbildung.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Testresultate des reellwertigen PCN. Je Funktion liegt eine H200-Repetition vor.}
+\label{tab:pcn-results}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lrrrl}
+\toprule
+Funktion & MAE & MAPE & $R^2$ & Status \\
+\midrule
+Ackley & 20.65 & 1.0000 & -323.40 & abgeschlossen \\
+Griewank & 121.34 & 0.9997 & -5.06 & abgeschlossen \\
+Rastrigin & 74.16 & 0.9999 & -13.88 & abgeschlossen \\
+Schwefel & 1676.46 & 1.0000 & -19.19 & nicht-finit \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Wichtig ist die Interpretation dieser negativen Resultate. Die PCN-Trainingskurven zeigen keine einfache, sofortige numerische Instabilitaet. Teile der internen Fehlerterme koennen sinken, doch die Test-Vorhersage bleibt fast unveraendert schlecht (Abb.~\ref{fig:pcn-cpcn}). Das spricht dafuer, dass das Modell nicht einfach abstuerzt, sondern dass die gewaehlte Inferenz- und Lernkonfiguration die Zielabbildung nicht effizient in eine generalisierende Vorhersage uebersetzt. Diese Beobachtung passt zur PCN-Diagnose aus dem Notebook: Bei sehr kleinen Datenmengen kann die gelabelte Inferenz deutlich bessere Trainingswerte erreichen, waehrend die freie Test-Inferenz schlecht bleibt. Fuer die Auswertung ist deshalb entscheidend, zwischen geklemmter Trainingsinferenz und echter Test-Inferenz zu unterscheiden. Genau hier liegt der zentrale Unterschied zu klassischer Backpropagation: Beim PCN muss nicht nur ein Gewichtspfad optimiert werden, sondern auch ein Inferenzprozess, der bei jedem Testpunkt neu ablaufen muss.
+
+\subsection{CPCN}
+
+Fuer CPCN liegen zehn abgeschlossene Wiederholungen pro Funktion vor. Das Modell ist damit stabiler als das reellwertige PCN, bleibt aber klar hinter CMLP zurueck.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{CPCN-Testresultate. Werte sind Mittelwerte $\pm$ Standardabweichung ueber zehn Wiederholungen.}
+\label{tab:cpcn-results}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lrrr}
+\toprule
+Funktion & MAE & MAPE & $R^2$ \\
+\midrule
+Ackley & $0.75\pm0.01$ & $0.0387\pm0.0008$ & $-0.0005\pm0.0005$ \\
+Griewank & $43.23\pm0.45$ & $0.6184\pm0.0213$ & $-0.0005\pm0.0007$ \\
+Rastrigin & $16.31\pm0.25$ & $0.2631\pm0.0049$ & $-0.0006\pm0.0009$ \\
+Schwefel & $311.13\pm2.92$ & $0.2104\pm0.0027$ & $-0.0000\pm0.0014$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Gegenueber dem reellwertigen PCN sind die Fehler deutlich kleiner, insbesondere auf Ackley und Schwefel. Gegenueber CMLP ist CPCN aber noch nicht konkurrenzfaehig. Die $R^2$-Werte nahe null deuten darauf hin, dass das Modell auf der Testmenge kaum mehr Varianz erklaert als eine konstante Mittelwertvorhersage. Das ist konsistent mit der Beobachtung zu groesseren Batch-Mittelungen: Wenn Updates stark geglaettet werden oder latente Zustaende in aehnliche Bereiche konvergieren, kann das Modell stabile, aber wenig informative Mittelwertloesungen finden. Gleichzeitig sinkt die Free Energy in den CPCN-Laeufen sichtbar, waehrend sich die Validierungs-MAE nur langsam oder kaum verbessert (Abb.~\ref{fig:pcn-cpcn}). Das bestaetigt den zentralen praktischen Befund: PC-basierte Modelle koennen intern stabile Zustaende finden, brauchen aber deutlich bessere Inferenz- und Lernkonfigurationen, damit diese interne Fehlerreduktion in bessere freie Vorhersagen uebersetzt wird.
+
+\subsection{Optimierungsbefund}
+
+Die Experimente sprechen gegen die einfache Aussage, dass Predictive Coding als direkter Ersatz fuer CMLP bereits funktioniert. CMLP bleibt die verlaesslichste Baseline. Der PC-Ansatz ist jedoch nicht wertlos: Er macht ein anderes Optimierungsproblem sichtbar. Die Schwierigkeit liegt nicht nur in Quaternion-Arithmetik, sondern in der Kopplung von latenter Inferenz, Zielnormalisierung, Lernrate, Anzahl Inferenzschritte, Batchgroesse und Testmodus.
+
+H2 und H3 werden damit nur teilweise bestaetigt. CPCN ist stabiler als PCN, aber diese Stabilitaet reicht noch nicht fuer gute Generalisierung. Fuer weitere Arbeit sollte deshalb nicht zuerst eine groessere Architektur getestet werden, sondern ein systematisches Optimierungsdesign: kleine Batchgroessen, DoE-basierte Hyperparametersuche ueber $\eta_{infer}$, $\eta_{learn}$ und $T_{infer}$, sowie getrennte Messung von geklemmter Trainingsinferenz und freier Test-Inferenz. Erst danach waere eine teurere GHR-PCN-Variante methodisch sinnvoll.

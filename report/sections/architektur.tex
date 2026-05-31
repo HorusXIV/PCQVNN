@@ -1,4 +1,39 @@
-\section{Experimente}
+\section{Methodik}
 
+\subsection{Daten und Benchmarks}
 
-\lipsum[27]
+Die Experimente verwenden vier Standardfunktionen zur nichtlinearen Funktionsapproximation: Ackley, Griewank, Rastrigin und Schwefel. Jede Funktion wird in vier Eingabedimensionen ausgewertet. Die Daten werden mit Latin-Hypercube-Sampling erzeugt und zufällig in Training, Validierung und Test aufgeteilt. Die Aufteilung betraegt 70\%, 15\%, 15\%. Pro Funktion werden 30'000 Punkte verwendet.
+
+Für die Quaternion-Modelle wird ein vierdimensionaler Eingabevektor $(x_1,x_2,x_3,x_4)$ als ein Quaternion kodiert:
+\[
+q_x = x_1 + x_2\mathbf{i}+x_3\mathbf{j}+x_4\mathbf{k}.
+\]
+Der skalare Zielwert $y=f(x)$ wird als reelles Quaternion $q_y=y+0\mathbf{i}+0\mathbf{j}+0\mathbf{k}$ gespeichert. Bewertet wird auf der urspruenglichen Zielskala mit MSE, MAE, MAPE und $R^2$.
+
+\subsection{Verglichene Modelle}
+
+Die reproduzierten Quaternion-Baselines verwenden die Architektur $1$-$5$-$5$-$5$-$1$: ein Eingabequaternion, drei versteckte quaternionwertige Schichten mit je fünf Neuronen und ein Ausgabequaternion. Getestet werden CMLP und GHR mit den Hyperparametern aus der Benchmark-Konfiguration.
+
+Zusätzlich wurden zwei PC-Varianten implementiert. Das \textbf{PCN} ist reellwertig, besitzt Eingabedimension 4 und latente Schichten der Grösse 20. Es dient als Kontrollmodell. Das \textbf{CPCN} ist eine split-quaternion Variante mit Architektur $1$-$5$-$5$-$5$-$1$. Es verwendet quaternionwertige Zustaende, Gewichte und Hamilton-Produkte, aber komponentenweise split Aktivierungen. Ziel ist eine Verbindung von QVNN und PCN, ohne in jeder Inferenziteration die volle GHR-Komplexitaet einzubauen.
+
+Die Implementierung ist modular. \texttt{src/qvnn\_pc/} enthält Benchmark-Funktionen, Datensplits, Quaternion-Operationen und Modellklassen. Separate Treiber starten den Architekturvergleich sowie die PCN- und CPCN-Benchmarks. Die Notebooks dokumentieren Sanity Checks, Reproduktionen der Baselines, PCN-Diagnosen und die Auswertung gespeicherter Läufe.
+
+\subsection{Optimierungsdesign}
+
+Die Hyperparameter der CMLP- und GHR-Baselines wurden nicht durch eine naive Grid Search neu gesucht, sondern aus der DoE-basierten Benchmark-Konfiguration uebernommen. In der Referenzstudie wird dafuer ein Fast-Flexible-Filling-Design verwendet, um Lernrate, Optimierer und Aktivierungsfunktion systematisch ueber den Suchraum zu verteilen \cite{bill2023comparison}. Das ist fuer diese Aufgabe sinnvoller als ein grobes Gitter: Die Optimierung im Quaternionraum ist teuer, Interaktionen zwischen Hyperparametern sind nicht linear, und viele Kombinationen sind numerisch wenig informativ.
+
+Ein relevantes Detail ist die Batchgroesse. Fuer die reproduzierten Quaternion-Backpropagation-Laeufe wird Batchgroesse 1 verwendet. Das ist nicht nur eine Laufzeitentscheidung, sondern beeinflusst die Optimierungsrichtung. Bei groesseren Batches werden Updates ueber viele Punkte und ueber vier gekoppelte Komponenten gemittelt. In Vorversuchen zeigte sich, dass sich gegenlaeufige Gradienten teilweise ausgleichen koennen; das Modell bewegt sich dann eher in Richtung einer Mittelwertvorhersage als in Richtung einer lokal passenden Funktionsapproximation.
+
+Bei PCN und CPCN kommen weitere Hyperparameter hinzu: Inferenzrate $\eta_{infer}$, Lernrate $\eta_{learn}$, Anzahl Inferenzschritte $T_{infer}$, Anzahl Lernschritte, Initialisierung der latenten Variablen und Testmodus. Dadurch ist die Optimierung nicht direkt mit einem klassischen NN vergleichbar. Ein klassisches NN optimiert primaer Gewichte; ein PCN optimiert zuerst latente Zustaende und danach Gewichte. Entscheidend ist deshalb nicht nur, ob die Free Energy sinkt, sondern ob die Inferenz bei unbekannten Testpunkten zu einer korrekten Ausgabe konvergiert.
+
+\subsection{Hypothesen}
+
+Aus Literatur und Voruntersuchungen ergeben sich drei Hypothesen:
+
+\begin{enumerate}
+    \item \textbf{H1:} CMLP ist auf den Benchmark-Funktionen die staerkste Quaternion-Backpropagation-Baseline.
+    \item \textbf{H2:} PCN kann interne Fehler reduzieren, aber die freie Test-Inferenz ist anfaelliger fuer Stagnation als klassische Backpropagation.
+    \item \textbf{H3:} CPCN sollte stabiler sein als ein reellwertiges PCN, weil die Daten bereits quaternionwertig repraesentiert sind. Unklar ist, ob diese Stabilitaet bereits zu guter Generalisierung fuehrt.
+\end{enumerate}
+
+Alle Abbildungen sind aus Platzgruenden im Anhang platziert. Im Haupttext werden die wichtigsten Werte und Interpretationen diskutiert.

@@ -2,6 +2,7 @@
 \input{fhnwheader}
 
 \usepackage{amsfonts,amssymb}
+\usepackage{booktabs}
 
 \usepackage[
   activate={true,nocompatibility}, % Aktiviert Protrusion und Expansion
@@ -13,6 +14,7 @@
   stretch=20,                     % Begrenzt die Schriftausdehnung (Standard: 20)
   shrink=20                       % Begrenzt die Schriftschrumpfung (Standard: 20)
 ]{microtype}
+\setlength{\emergencystretch}{3em}
 
 \newcommand{\logofilename}{FHNW_HSI_DE}
 
@@ -60,10 +62,12 @@ Datum: & Windisch, Mai 2026\\
 \input{sections/schluss}
 
 
-\
 {\sloppypar
 \printbibliography[heading=bibintoc, title=Quellenverzeichnis]
 }
 
+\clearpage
+\onecolumn
+\input{sections/appendix}
 
 \end{document}

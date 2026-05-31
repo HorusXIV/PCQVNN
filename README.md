@@ -95,6 +95,53 @@ Die wichtigsten PCN-Parameter sind:
 * `adaptive_inference`: erlaubt frühen Abbruch der Inferenz, wenn die latenten Gradienten klein genug sind.
 * `normalize_targets`: stabilisiert Funktionen mit stark unterschiedlichen Zielskalen und sollte für PCN-Läufe aktiviert bleiben.
 
+## Repostruktur
+
+```text
+configs/     Hyperparameter fuer CMLP/GHR-Vergleiche
+cluster/     Apptainer-Definition und SLURM-Skripte fuer HPC-Laeufe
+notebooks/   Explorative Checks und Analyse-Notebooks
+results/     Gespeicherte Experimentresultate und Modellartefakte
+src/         Python-Package `qvnn_pc`
+tests/       Pytest-Suite fuer Algebra, Datenpipeline, Modelle und Benchmarks
+report/      LaTeX-Abgabebericht
+```
+
+Die wichtigsten Einstiegspunkte im Code sind:
+
+* `qvnn_pc.data`: Benchmark-Datengenerierung und Train/Val/Test-Splits.
+* `qvnn_pc.models`: CMLP, GHR, klassisches MLP, real-valued PCN und split-quaternion PCN.
+* `qvnn_pc.architecture_comparison`: CMLP/GHR-Vergleich.
+* `qvnn_pc.pcn_benchmark`, `qvnn_pc.cpcn_benchmark`: PCN- und CPCN-Laeufe.
+* `qvnn_pc.pcn_hyperparameter_search`: Hyperparametersuche fuer das real-valued PCN.
+
+## Setup
+
+Mit `uv`:
+
+```bash
+uv sync
+uv run pytest tests -q
+uv run python -m qvnn_pc.architecture_comparison --benchmark ackley --output results/local_archcmp_ackley.csv
+```
+
+Ohne `uv`, mit einer klassischen virtuellen Umgebung:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+python -m pytest tests -q
+```
+
+Die Cluster-Laeufe verwenden das Container-Setup aus `cluster/pcqvnn.def`. Das Image wird einmal gebaut und danach mit den SLURM-Skripten gestartet:
+
+```bash
+apptainer build cluster/pcqvnn.sif cluster/pcqvnn.def
+sbatch cluster/run_architecture_comparison.slurm
+```
+
 ## References
 
 *   Bill, J., Champagne, L., Cox, B., & Bihl, T. (2021). [Meta-Heuristic Optimization Methods for Quaternion-Valued Neural Networks](https://doi.org). *Mathematics*, 9(938).
