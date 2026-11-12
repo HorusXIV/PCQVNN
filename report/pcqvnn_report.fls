@@ -499,6 +499,7 @@ INPUT /usr/share/texmf/fonts/tfm/public/lm/ec-lmssbx10.tfm
 INPUT /usr/share/texmf/fonts/tfm/public/lm/ec-lmssbx10.tfm
 INPUT /var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map
 INPUT /usr/share/texmf/fonts/enc/dvips/lm/lm-ec.enc
+INPUT /usr/share/texmf/fonts/tfm/public/lm/ec-lmro10.tfm
 INPUT /usr/share/texmf/fonts/enc/dvips/lm/lm-rm.enc
 INPUT ./sections/einleitung.tex
 INPUT ./sections/einleitung.tex
@@ -514,7 +515,6 @@ INPUT ./sections/grundlagen.tex
 INPUT ./sections/grundlagen.tex
 INPUT sections/grundlagen.tex
 INPUT /usr/share/texmf/fonts/tfm/public/lm/ec-lmssbx10.tfm
-INPUT /usr/share/texmf/fonts/tfm/public/lm/ec-lmro10.tfm
 INPUT /usr/share/texmf/fonts/enc/dvips/lm/lm-mathit.enc
 INPUT /usr/share/texmf/fonts/enc/dvips/lm/lm-mathsy.enc
 INPUT /usr/share/texmf/fonts/enc/dvips/lm/lm-mathex.enc
