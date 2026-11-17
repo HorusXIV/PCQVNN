@@ -1,5 +1,41 @@
 # Quaternion-Valued Neural Networks and Predictive Coding
 
+Forschungsprojekt zu quaternionwertigen neuronalen Netzwerken und Predictive
+Coding auf vier nichtlinearen Regressionsbenchmarks: Ackley, Griewank,
+Rastrigin und Schwefel. Implementiert sind CMLP/GHR-Baselines, ein reellwertiges
+PCN und ein split-quaternion CPCN.
+
+## Ergebnisse und Status
+
+Der aktuelle Bericht findet CMLP auf Ackley, Griewank und Rastrigin am stärksten;
+auf Schwefel schneidet GHR leicht besser ab. Das reellwertige PCN liefert in der
+freien Test-Inferenz keine brauchbare Funktionsapproximation. CPCN ist stabiler
+und verbessert die Fehler gegenüber PCN, erklärt auf der Testmenge aber noch
+fast keine Varianz. Die aktuelle Implementierung zeigt daher keine mit den
+Backpropagation-Baselines konkurrenzfähige Generalisierung.
+
+Diese Zusammenfassung stammt aus dem [Berichtsabstract](report/sections/abstract.tex).
+Details und Versuchsbedingungen stehen in `report/` und den gespeicherten
+Experimentresultaten. Bei dieser README-Überarbeitung wurden keine neuen
+Benchmarks ausgeführt.
+
+## Schnellstart
+
+Alle folgenden Befehle beziehen sich auf das Verzeichnis `PCQVNN/`, nicht auf
+das Wurzelverzeichnis des übergeordneten Git-Repositories. Benötigt werden
+Python 3.11 oder 3.12 und uv.
+
+```bash
+# Vom Wurzelverzeichnis des Git-Repositories:
+cd PCQVNN
+uv sync
+uv run pytest tests -q
+```
+
+Die Benchmark-Daten werden im Projekt synthetisch erzeugt; ein externer
+Teilnehmerdatensatz ist dafür nicht erforderlich. Cluster-Skripte setzen eine
+passende Slurm-/Apptainer-Umgebung voraus.
+
 ## Projektidee
 
 In diesem Projekt möchte ich untersuchen, ob ein quaternionwertiges neuronales Netzwerk (QVNN) mit Predictive Coding (PC) vernünftig trainiert werden kann und wie sich ein solches Modell bei Standardaufgaben zur Approximation nichtlinearer Funktionen im Vergleich zu einem starken Quaternion-Backpropagation-Basismodell schlägt.  
@@ -57,7 +93,7 @@ Die GHR-Variante bleibt als mathematisch reichere Forschungsrichtung interessant
 Quaternion-Matrixmultiplikation wird für den üblichen Layer-Fall über gekoppelte Real-GEMMs formuliert. Das vermeidet grosse temporäre Tensoren der Form `(batch, out, in, 4)` und nutzt die optimierten Matrixmultiplikationen von PyTorch besser aus. Für kleine Forschungsmodelle ist der Unterschied moderat; für breitere PC/QVNN-Varianten wird dieser Punkt wichtig.
 
 ### Baseline & Evaluation
-Als primäre Baseline dient das CMLP (Clifford Multilayer Perceptron)-Verfahren, das in der Vergleichsstudie von Bill et al. die besten Resultate lieferte. Evaluiert wird die Performance bei der Approximation nichtlinearer Funktionen hinsichtlich:
+Als Baselines dienen das CMLP (Clifford Multilayer Perceptron)-Verfahren und die GHR-Variante. Evaluiert wird die Performance bei der Approximation nichtlinearer Funktionen hinsichtlich:
 
 * Approximationsgenauigkeit (MSE)
 * Konvergenzgeschwindigkeit
@@ -144,7 +180,19 @@ sbatch cluster/run_architecture_comparison.slurm
 
 ## References
 
-*   Bill, J., Champagne, L., Cox, B., & Bihl, T. (2021). [Meta-Heuristic Optimization Methods for Quaternion-Valued Neural Networks](https://doi.org). *Mathematics*, 9(938).
-*   Bill, J., Cox, B. A., & Champagne, L. (2023). [A Comparison of Quaternion Neural Network Backpropagation Algorithms](https://doi.org). *Expert Systems with Applications*, 232, 120448.
+*   Bill, J., Champagne, L., Cox, B., & Bihl, T. (2021). Meta-Heuristic Optimization Methods for Quaternion-Valued Neural Networks. *Mathematics*, 9(938).
+*   Bill, J., Cox, B. A., & Champagne, L. (2023). A Comparison of Quaternion Neural Network Backpropagation Algorithms. *Expert Systems with Applications*, 232, 120448.
 *   Stenlund, M. (2025). [Introduction to Predictive Coding Networks for Machine Learning](https://arxiv.org/abs/2506.06332). *arXiv preprint arXiv:2506.06332*.
-*   Takahashi, K., Fujimoto, A., Kawakami, S., Mitera, H., & Hashimoto, M. (2025). [Optimal Predictive Control Using Quaternion-Valued Neural Network-Based System Identification](https://doi.org). *Journal of the Institute of Industrial Applications Engineers*, 13, 11–20.
+*   Takahashi, K., Fujimoto, A., Kawakami, S., Mitera, H., & Hashimoto, M. (2025). Optimal Predictive Control Using Quaternion-Valued Neural Network-Based System Identification. *Journal of the Institute of Industrial Applications Engineers*, 13, 11–20.
+
+## Repository-Hinweise
+
+Dieses Projekt bleibt im Unterverzeichnis `PCQVNN/` des OML-Repositories; die
+bestehende Git-Historie wird nicht verändert. Resultate unter `results/`
+verwenden Git LFS. Das Archiv `Archiv.tar.gz` enthält weitere gespeicherte
+Resultate. Berichts-Builddateien und das Archiv sind für das Ausführen des
+Python-Packages nicht erforderlich.
+
+Die Literaturangaben oben wurden aus der bestehenden Dokumentation übernommen;
+unvollständige DOI-Platzhalter wurden entfernt. Bestehende Lizenz- und
+Attributionshinweise von Referenzcode gelten weiterhin.
